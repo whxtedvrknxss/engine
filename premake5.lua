@@ -3,32 +3,29 @@ workspace "Engine"
 
   configurations 
   {
-    "debug",
-    "release"
+    "Debug",
+    "Release"
   }
+
+  group "Dependencies"
+    include "tools/premake"
+    include "Engine/external/glfw"
+    include "Engine/external/imgui"
+  group ""
 
 outputdir = "%{cfg.architecture}-%{cfg.buildcfg}"
 
-project "Engine"
-  location "Engine"
-  language "C++"
-  kind "ConsoleApp"
-  cppdialect "C++20"
+VULKAN_SDK = os.getenv("VULKAN_SDK")
 
-  targetdir ("build/bin/" .. outputdir .. "/%{prj.name}")
-  objdir ("build/obj/" .. outputdir .. "/%{prj.name}")
-  
-  files 
-  {
-    "%{prj.name}/src/**.h",
-    "%{prj.name}/src/**.cpp"
-  }
+IncludeDir = {}
+IncludeDir["glfw"] = "%{wks.location}/Engine/external/glfw/include"
+IncludeDir["glm"] = "%{wks.location}/Engine/external/glm/include"
+IncludeDir["imgui"] = "%{wks.location}/Engine/external/imgui"
+IncludeDir["stb_image"] = "%{wks.location}/Engine/external/stb_image"
+IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 
-  includedirs 
-  {
-    "%{prj.name}/src"
-  }
+LibraryDir = {}
+LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Libs"
 
-  filter "system:windows"
-    systemversion "latest"
-
+Library = {}
+Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
