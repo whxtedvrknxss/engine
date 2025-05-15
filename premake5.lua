@@ -1,6 +1,5 @@
 workspace "Engine"
   architecture "x64"
-  startproject "Sandbox"
 
   configurations 
   {
@@ -8,6 +7,7 @@ workspace "Engine"
     "Release"
   }
 
+  startproject "Sandbox"
 
 outputdir = "%{cfg.architecture}-%{cfg.buildcfg}"
 
@@ -34,7 +34,7 @@ IncludeDir["stb_image"] = "%{wks.location}/Engine/external/stb_image"
 IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 
 LibraryDir = {}
-LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Libs"
+LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 
 Library = {}
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"

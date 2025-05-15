@@ -6,6 +6,12 @@ project "Engine"
 
   targetdir ("%{wks.location}/build/bin/" .. outputdir .. "/%{prj.name}")
   objdir ("%{wks.location}/build/obj/" .. outputdir .. "/%{prj.name}")
+
+  defines 
+  {
+    "_CRT_SECURE_NO_WARNINGS",
+    "GLFW_INCLUDE_NONE"
+  }
   
   files 
   {
@@ -26,15 +32,14 @@ project "Engine"
   links 
   {
     "glfw",
-    "glm",
     "imgui",
-    "stb_image"
+    "%{Library.Vulkan}"
   }
 
   systemversion "latest"
 
   filter "configurations:Debug"
-    defines "Debug"
+    defines "DEBUG"
     runtime "Debug"
     symbols "on"
 
