@@ -1,12 +1,11 @@
 project "Engine"
-  location "Engine"
   language "C++"
-  kind "ConsoleApp"
+  kind "StaticLib"
   cppdialect "C++20"
   staticruntime "off"
 
-  targetdir ("build/bin/" .. outputdir .. "/%{prj.name}")
-  objdir ("build/obj/" .. outputdir .. "/%{prj.name}")
+  targetdir ("%{wks.location}/build/bin/" .. outputdir .. "/%{prj.name}")
+  objdir ("%{wks.location}/build/obj/" .. outputdir .. "/%{prj.name}")
   
   files 
   {
