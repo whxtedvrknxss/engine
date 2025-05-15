@@ -1,3 +1,6 @@
 [submodule "Engine/external/imgui"]
 	path = Engine/external/imgui
 	url = https://github.com/whxtedvrknxss/imgui
+[submodule "Engine/external/glfw"]
+	path = Engine/external/glfw
+	url = https://github.com/whxtedvrknxss/glfw
