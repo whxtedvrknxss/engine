@@ -14,6 +14,9 @@ project "Engine"
   language "C++"
   kind "ConsoleApp"
   cppdialect "C++20"
+
+  targetdir ("build/bin/" .. outputdir .. "/%{prj.name}")
+  objdir ("build/obj/" .. outputdir .. "/%{prj.name}")
   
   files 
   {
