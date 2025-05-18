@@ -15,7 +15,7 @@ group "Core"
   include "Engine"
 group ""
 
-group "Miscelaneous"
+group "Miscellaneous"
   include "Sandbox"
 group ""
 

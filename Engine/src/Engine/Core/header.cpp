@@ -27,6 +27,8 @@ void show_window() {
     std::printf( "%s\n", properties[i].extensionName);
   }
 
+  glfwShowWindow( window );
+
   auto str { std::to_string( extension_count ) };
   glfwSetWindowTitle( window, str.c_str() );
 

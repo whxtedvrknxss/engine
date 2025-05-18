@@ -15,8 +15,8 @@ project "Engine"
   
   files 
   {
-    "src/**.h",
-    "src/**.cpp"
+    "src/Engine/**.h",
+    "src/Engine/**.cpp"
   }
 
   includedirs 
@@ -37,6 +37,15 @@ project "Engine"
   }
 
   systemversion "latest"
+
+  filter "system:Windows"
+    defines "PLATFORM_WINDOWS"
+
+    files
+    {
+      "src/Platform/WindowsWindow.h",
+      "src/Platform/WindowsWindow.cpp"
+    }
 
   filter "configurations:Debug"
     defines "DEBUG"
