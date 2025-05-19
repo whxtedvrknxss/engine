@@ -43,8 +43,10 @@ project "Engine"
 
     files
     {
-      "src/Platform/WindowsWindow.h",
-      "src/Platform/WindowsWindow.cpp"
+      "src/Platform/Windows/**.h",
+      "src/Platform/Windows/**.cpp",
+      "src/Platform/Vulkan/**.h",
+      "src/Platform/Vulkan/**.cpp"
     }
 
   filter "configurations:Debug"

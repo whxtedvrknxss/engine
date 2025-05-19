@@ -3,9 +3,10 @@
 #ifndef __windows_window_h_included__
 #define __windows_window_h_included__
 
-#include <GLFW/glfw3.h>
-
 #include "Engine/Core/Window.h"
+#include "Engine/Core/Common.h"
+
+struct GLFWwindow;
 
 class WindowsWindow : public Window {
 public:
@@ -14,16 +15,16 @@ public:
   ~WindowsWindow() override;
   
 	void OnUpdate() override;
-  void* GetNativeWindow() const override;
+  virtual void* GetNativeWindow() const { return m_Window; }
 
 private:
   GLFWwindow* m_Window;
 
   struct {
-    uint32_t Width;
-    uint32_t Height;
-    std::string Title;  
-    bool VSync;
+    Vec2<uint32_t> Position;
+    Vec2<uint32_t> Size;
+    std::string    Title;  
+    bool           VSync;
   } m_Data;
 };
 

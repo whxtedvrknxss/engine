@@ -6,15 +6,16 @@
 #include <string>
 #include <memory>
 
+#include "Engine/Core/Common.h"
+
 struct WindowCreateInfo {
-  uint32_t Width;
-  uint32_t Height;
-  std::string Title;
+  Vec2<uint32_t> Position;
+  Vec2<uint32_t> Size;
+  std::string    Title;
 };
 
 class Window {
 public:
-  Window( const Window &window ) = delete;
   virtual ~Window() = default;
   
   virtual void OnUpdate() = 0;
