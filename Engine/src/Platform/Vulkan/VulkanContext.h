@@ -1,29 +1,22 @@
-// src/Platform/Vulkan/VulkanContext.h
+// src/Engine/Renderer/Core/VulkanContext.h
 
-#ifndef __vulkan_vulkan_context_h__
-#define __vulkan_vulkan_context_h__
+#ifndef __renderer_vulkan_context_h_included__
+#define __renderer_vulkan_context_h_included__  
 
-#include <cstdint>
-#include <vector>
+#include <vulkan/vulkan.hpp>
 
-#include "VulkanDevice.h"
+#include "Engine/Renderer/GraphicsContext.h"
 
-struct VulkanContextCreateInfo {
-  int32_t VulkanApiMajorVersion;
-  int32_t VulkanApiMinorVersion;
-  std::vector<const char*> Layers;
-  std::vector<const char*> Extensions;
-};
+struct GLFWwindow;
 
-class VulkanContext {
+class VulkanContext : public GraphicsContext {
 public:
-  VulkanContext();
+  VulkanContext(GLFWwindow *window_handle);
 
 private:
-  bool CheckRequestedValidationLayers(const VulkanContextCreateInfo& options) const;
+  GLFWwindow* m_WindowHandle;
 
-private:
-  VulkanDevice m_Device;
+  vk::Instance m_Instance;
 };
 
 #endif 

@@ -11,15 +11,13 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
-#include "Platform/Vulkan/VulkanContext.h"
+#include "Assert.h"
 
 void show_window() {
   glfwInit();
 
   glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
   GLFWwindow *window = glfwCreateWindow( 800, 600, "vulkan window", nullptr, nullptr );
-
-  VulkanContext context;
 
   glfwSetDropCallback( window, [] ( GLFWwindow* window, int count, const char* paths[] ) {
     for ( int i = 0; i < count; i++ ) {
@@ -30,6 +28,8 @@ void show_window() {
 
   glfwShowWindow( window );
 
+  ASSERT( false && "gabela ahaahhah" );
+
   glm::mat4 matrix;
   glm::vec4 vec;
   auto test = matrix * vec;
@@ -39,7 +39,6 @@ void show_window() {
   }
 
   glfwDestroyWindow( window );
-
   glfwTerminate();
 }
 

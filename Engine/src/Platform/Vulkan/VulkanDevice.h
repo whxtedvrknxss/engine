@@ -1,23 +1,23 @@
-// src/Platform/Vulkan/Device.h
+// src/Engine/Renderer/Core/VulkanDevice.h
 
-#ifndef __vulkan_device_h_included__
-#define __vulkan_device_h_included__
+#ifndef __renderer_vulkan_device_h_included__
+#define __renderer_vulkan_device_h_included__
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
+
+struct VulkanDeviceFeatures {
+  std::vector<const char*> Extensions;
+  std::vector<const char*> Layers;
+};
 
 class VulkanDevice {
 public:
   VulkanDevice();
 
 private:
-  void CreateInstance();
-
-
-
-private:
-  VkInstance m_Instance;
-  VkPhysicalDevice m_PhysicalDevice;
-  VkDevice m_Device;
+  vk::PhysicalDevice m_PhysicalDevice;
+  vk::Device m_LogicalDevice;
+  vk::Queue m_GraphicsQueue;
 };
 
 #endif 

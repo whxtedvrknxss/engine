@@ -6,9 +6,10 @@
 #include <memory>
 
 #include "Window.h"
+#include "Common.h"
 
 class Application {
-  std::unique_ptr<Window> m_Window;
+  Scope<Window> m_Window;
 };
 
 #endif 
