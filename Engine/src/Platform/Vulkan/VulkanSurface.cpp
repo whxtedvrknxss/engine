@@ -10,14 +10,8 @@
 void VulkanSurface::Create(const VulkanInstance& instance, GLFWwindow* window) {
   m_InstanceHandle = instance;
 
-  VkResult res = glfwCreateWindowSurface(
-    m_InstanceHandle.Get(),
-    window,
-    nullptr,
-    &m_Surface
-  );
-
-  if ( res != VK_SUCCESS ) {
+  if ( VkResult res = glfwCreateWindowSurface( m_InstanceHandle.Get(), window, nullptr,
+      &m_Surface ); res != VK_SUCCESS ) {
     throw std::runtime_error( "error creating Vulkan instance!" );
   }
 }

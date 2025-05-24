@@ -7,6 +7,7 @@ a **general purpose game engine**.
 
 The desired "things" to be present:
 - [ ] 2D and 3D Renderer(Vulkan, OpenGL, DirectX11 and DirectX12)
+- [ ] Slang shading language usage
 - [ ] Scenes 
 - [ ] Animation system
 - [ ] Physics 
@@ -16,6 +17,7 @@ The desired "things" to be present:
 - [ ] SIMD usage
 - [ ] Networking
 - [ ] Sound 
+
 
 The set of this things is composed of the different stuff i want to try to work with,
 obviously that some of the features won't be necessary, but as previously said, the purpose of the 

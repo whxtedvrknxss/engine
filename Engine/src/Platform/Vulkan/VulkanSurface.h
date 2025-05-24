@@ -14,6 +14,8 @@ public:
   void Create( const VulkanInstance& instance, GLFWwindow* window );
   void Cleanup();
 
+  VkSurfaceKHR Get() const { return m_Surface; }
+
 private:
   VkSurfaceKHR m_Surface;
 
