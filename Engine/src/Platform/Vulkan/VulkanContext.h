@@ -5,18 +5,19 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include "VulkanInstance.h"
 #include "Engine/Renderer/GraphicsContext.h"
 
 struct GLFWwindow;
 
 class VulkanContext : public GraphicsContext {
 public:
-  VulkanContext(GLFWwindow *window_handle);
+  VulkanContext( GLFWwindow* window_handle );
 
 private:
   GLFWwindow* m_WindowHandle;
 
-  vk::Instance m_Instance;
+  VulkanInstance m_Instance;
 };
 
 #endif 

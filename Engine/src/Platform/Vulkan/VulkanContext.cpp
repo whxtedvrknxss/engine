@@ -33,7 +33,12 @@ static bool CheckRequestedExtensions( const std::vector<const char*>& extensions
 }
 
 static bool CheckRequestedLayers( const std::vector<const char*>& layers ) {
-  auto available = vk::enumerateInstanceLayerProperties();
+  uint32_t count = 0;
+  vkEnumerateInstanceLayerProperties( &count, nullptr );
+
+  std::vector<VkLayerProperties> available( count );
+  vkEnumerateInstanceLayerProperties( &count, available.data() );
+
   for ( const char* name : layers) {
     auto it = std::find_if(
       available.begin(),
@@ -42,10 +47,6 @@ static bool CheckRequestedLayers( const std::vector<const char*>& layers ) {
         return std::strcmp( name, layer.layerName.data() );
       }
     );
-
-    if (it == available.end()) {
-      return false;
-    }
   }
 
   return true;

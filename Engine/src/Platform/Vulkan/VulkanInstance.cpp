@@ -1,19 +1,17 @@
 #include "VulkanInstance.h"
 
 #include <GLFW/glfw3.h>
-
-#include "Engine/Core/Common.h"
+#include <vulkan/vulkan.h>
 
 void VulkanInstance::Create( bool enable_validation ) {
   m_EnableValidation = enable_validation;
 
-  vk::ApplicationInfo app_info = {};
-  app_info
-    .setPApplicationName( "Engine" )
-    .setPEngineName( "Engine" )
-    .setApplicationVersion( vk::makeApiVersion( 0, 0, 0, 1 ) )
-    .setEngineVersion( vk::makeApiVersion( 0, 0, 0, 1 ) )
-    .setApiVersion( vk::ApiVersion12 );
+  VkApplicationInfo app_info = {};
+  app_info.pApplicationName( "Engine" );
+  app_info.pEngineName( "Engine" );
+  app_info.applicationVersion( VK_MAKE_API_VERSION( 0, 0, 0, 1 ) );
+  app_info.engineVersion( VK_MAKE_API_VERSION( 0, 0, 0, 1 ) );
+  app_info.apiVersion( VK_API_VERSION_1_2 );
 
   auto extensions = GetRequiredExtensions();
   vk::InstanceCreateInfo instance_info = {};
@@ -36,9 +34,14 @@ void VulkanInstance::Create( bool enable_validation ) {
         vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
         vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
         vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
-      )
-      .setPfnUserCallback( STATIC_CAST(PFN_vkDebugUtilsMessengerCallbackEXT, debug_callback) );
+      );
   }
+
+  m_Instance = vk::createInstance( instance_info );
+}
+
+vk::Instance VulkanInstance::Get() const {
+  return m_Instance;
 }
 
 std::vector<const char*> VulkanInstance::GetRequiredExtensions() const {

@@ -3,7 +3,10 @@
 #ifndef __renderer_vulkan_device_h_included__
 #define __renderer_vulkan_device_h_included__
 
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan.h>
+
+#include "VulkanInstance.h"
+#include "VulkanSurface.h"
 
 struct VulkanDeviceFeatures {
   std::vector<const char*> Extensions;
@@ -12,12 +15,19 @@ struct VulkanDeviceFeatures {
 
 class VulkanDevice {
 public:
-  VulkanDevice();
+  void Create( VulkanInstance instance, VulkanSurface surface );
 
 private:
-  vk::PhysicalDevice m_PhysicalDevice;
-  vk::Device m_LogicalDevice;
-  vk::Queue m_GraphicsQueue;
+  void PickPhysicalDevice();
+  void CreateLogicalDevice();
+
+private:
+  VulkanInstance& m_InstanceHandle;
+  
+private:
+  VkPhysicalDevice m_PhysicalDevice;
+  VkDevice m_LogicalDevice;
+  VkQueue m_GraphicsQueue;
 };
 
 #endif 

@@ -17,6 +17,6 @@ WindowsWindow::~WindowsWindow() {
 }
 
 void WindowsWindow::OnUpdate() {
-  glfwSwapBuffers( m_Window );
+  //glfwSwapBuffers( m_Window );
 }
 

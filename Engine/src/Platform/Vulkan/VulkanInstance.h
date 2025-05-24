@@ -3,12 +3,16 @@
 #ifndef __renderer_vulkan_instance_h_included__
 #define __renderer_vulkan_instance_h_included__
 
-#include <vulkan/vulkan.hpp>
+#include <vector>
+
+#include <vulkan/vulkan.h>
 
 class VulkanInstance {
 public:
   void Create( bool enable_validation = true );
-  vk::Instance Get() const;
+  VkInstance Get() const {
+    return m_Instance;
+  }
 
 private:
   std::vector<const char*> GetRequiredExtensions() const;
@@ -17,8 +21,8 @@ private:
 private:
   bool m_EnableValidation;
 
-  vk::Instance m_Instance;
-  vk::DebugUtilsMessengerEXT m_DebugMessenger;
+  VkInstance m_Instance;
+  VkDebugUtilsMessengerEXT m_DebugMessenger;
 };
 
 #endif 

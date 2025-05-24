@@ -10,6 +10,11 @@
 
 class Application {
   Scope<Window> m_Window;
+
+public:
+  Application();
+
+
 };
 
 #endif 
