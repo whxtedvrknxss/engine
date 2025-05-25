@@ -27,24 +27,29 @@ class VulkanDevice {
 public:
   void Create( VulkanInstance* instance, const VulkanSurface& surface );
 
-  VkPhysicalDevice GetPhysical() const { return m_PhysicalDevice; }
-  VkDevice GetLogical() const { return m_LogicalDevice; }
+  VkPhysicalDevice Physical() const { return m_PhysicalDevice; }
+  VkDevice Logical() const { return m_LogicalDevice; }
+
+  static QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice physical_device,
+    VkSurfaceKHR surface );
 
 private:
+  static bool IsDeviceSuitable( VulkanDevice* device, VulkanSurface* surface );
+
   void PickPhysicalDevice();
   void CreateLogicalDevice();
 
 private:
   VulkanInstance* m_InstanceHandle = nullptr;
-  VkSurfaceKHR m_SurfaceHandle =  VK_NULL_HANDLE;
+  VulkanSurface* m_SurfaceHandle = nullptr;
 
   VulkanDeviceFeatures m_Features;
   
 private:
-  VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE ;
+  VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
   VkDevice m_LogicalDevice          = VK_NULL_HANDLE;
-  VkQueue m_GraphicsQueue           = VK_NULL_HANDLE ;
-  VkQueue m_PresentQueue            = VK_NULL_HANDLE ;
+  VkQueue m_GraphicsQueue           = VK_NULL_HANDLE;
+  VkQueue m_PresentQueue            = VK_NULL_HANDLE;
 }; 
 
 #endif 

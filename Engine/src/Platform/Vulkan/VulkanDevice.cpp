@@ -1,19 +1,67 @@
 #include "VulkanDevice.h"
 
 #include <format>
+#include <mutex>
 #include <set>
 #include <stdexcept>
 
 #include "Engine/Core/Common.h"
+#include "VulkanSwapchain.h"
 
-void VulkanDevice::Create(VulkanInstance* instance, const VulkanSurface& surface) {
+void VulkanDevice::Create(VulkanInstance* instance, VulkanSurface* surface) {
   m_InstanceHandle = instance;
-  m_SurfaceHandle = surface.Get();
+  m_SurfaceHandle = surface;
 
   m_Features.Extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
   PickPhysicalDevice();
   CreateLogicalDevice();
+}
+
+QueueFamilyIndices VulkanDevice::FindQueueFamilies(VkPhysicalDevice physical_device,
+    VkSurfaceKHR surface) {
+  uint32_t count = 0;
+  vkGetPhysicalDeviceQueueFamilyProperties( physical_device, &count, nullptr );
+  std::vector<VkQueueFamilyProperties> families( count );
+  vkGetPhysicalDeviceQueueFamilyProperties( physical_device, &count, families.data() );
+
+  QueueFamilyIndices indices;
+
+  for ( uint32_t i = 0; i < count; ++i ) {
+    if ( families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) {
+      indices.GraphicsFamily = i;
+    }
+
+    VkBool32 present_support = false;
+    vkGetPhysicalDeviceSurfaceSupportKHR( physical_device, i, surface, &present_support );
+
+    if ( present_support ) {
+      indices.PresentFamily = i;
+    }
+
+    if ( indices.IsComplete() ) {
+      break;
+    }
+  }
+
+  return indices;
+}
+
+bool VulkanDevice::IsDeviceSuitable( VulkanDevice* device, VulkanSurface* surface ) {
+  QueueFamilyIndices indices = FindQueueFamilies( device->Physical(), surface->Get() );
+  bool extensions_supported = true /* CheckDeviceExtensionSupport( m_LogicalDevice ) */;
+
+  bool swapchain_adequate = false;
+  if ( extensions_supported ) {
+    SwapChainSupportDetails details = VulkanSwapchain::QuerySwapChainSupport( device, surface );
+    swapchain_adequate = !details.Formats.empty() && !details.PresentModes.empty();
+  }
+
+  VkPhysicalDeviceFeatures features;
+  vkGetPhysicalDeviceFeatures( device->Physical(), &features );
+
+  return indices.IsComplete() && extensions_supported && swapchain_adequate && 
+    features.samplerAnisotropy;
 }
 
 void VulkanDevice::PickPhysicalDevice() {
@@ -28,7 +76,7 @@ void VulkanDevice::PickPhysicalDevice() {
   vkEnumeratePhysicalDevices( m_InstanceHandle->Get(), &count, devices.data() );
 
   for ( const auto& device : devices ) {
-    if ( true ) { // IsDeviceSuitable()
+    if ( IsDeviceSuitable( this, m_SurfaceHandle ) ) { // ???
       m_PhysicalDevice = device;
       break;
     }
@@ -40,35 +88,7 @@ void VulkanDevice::PickPhysicalDevice() {
 }
 
 void VulkanDevice::CreateLogicalDevice() {
-  auto FindQueueFamilies = [](VkPhysicalDevice physical_device, VkSurfaceKHR surface) {
-    uint32_t count = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties( physical_device, &count, nullptr );
-    std::vector<VkQueueFamilyProperties> families( count );
-    vkGetPhysicalDeviceQueueFamilyProperties( physical_device, &count, families.data() );
-
-    QueueFamilyIndices indices;
-
-    for (uint32_t i = 0; i < count; ++i) {
-      if ( families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) {
-        indices.GraphicsFamily = i;
-      }
-
-      VkBool32 present_support = false;
-      vkGetPhysicalDeviceSurfaceSupportKHR( physical_device, i, surface, &present_support );
-
-      if ( present_support ) {
-        indices.PresentFamily = i;
-      }
-
-      if ( indices.IsComplete() ) {
-        break;
-      }
-    }
-
-    return indices;
-  };
-
-  QueueFamilyIndices indices = FindQueueFamilies( m_PhysicalDevice, m_SurfaceHandle );
+  QueueFamilyIndices indices = FindQueueFamilies( m_PhysicalDevice, m_SurfaceHandle->Get() );
 
   std::vector<VkDeviceQueueCreateInfo> queue_infos;
   std::set unique_families = {
