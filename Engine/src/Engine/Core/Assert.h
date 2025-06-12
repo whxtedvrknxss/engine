@@ -6,15 +6,9 @@
 #include "Common.h"
 
 #include <cassert>
-
-  #ifdef ENABLE_ASSERT
-
-    #define ASSERT(expression) assert(expression)
-
-  #else
-
-    #define ASSERT(expression) (void)0
-
-  #endif 
-
+#ifdef ENABLE_ASSERT
+#       define ASSERT( expression )             assert( expression )
+#   else
+#       define ASSERT( expression )             ( void ) 0
+#endif 
 #endif

@@ -1,78 +1,93 @@
 #include "VulkanContext.h"
 
+#include <stdexcept>
+
 #include "Engine/Core/Common.h"
-#include "GLFW/glfw3.h"
+
+#include <SDL3/SDL_vulkan.h>
 
 static std::vector<const char*> GetRequiredExtensions() {
-  uint32_t count = 0;
-  const char** glfw_extensions = glfwGetRequiredInstanceExtensions( &count );
+    uint32_t count = 0;
+    auto glfw_extensions = SDL_Vulkan_GetInstanceExtensions( &count );
 
-  std::vector extensions( glfw_extensions, glfw_extensions + count );
-  extensions.push_back( vk::EXTDebugUtilsExtensionName );
+    std::vector extensions( glfw_extensions, glfw_extensions + count );
+    extensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
 
-  return extensions;
+    return extensions;
 }
 
 static bool CheckRequestedExtensions( const std::vector<const char*>& extensions ) {
-  auto available = vk::enumerateInstanceExtensionProperties();
-  for ( const char* name : extensions ) {
-    auto it = std::find_if(
-      available.begin(),
-      available.end(),
-      [name] ( const vk::ExtensionProperties& extension ) {
-        return std::strcmp( name, extension.extensionName.data() );
-      } 
-    );
-
-    if ( it == available.end() ) {
-      return false;
+    uint32_t count = 0;
+    if ( VkResult res = vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr ); res != VK_SUCCESS ) {
+        std::fprintf( stderr, "Failed to enumerate Instance Extensions count. Error code: %d", res );
     }
-  }
 
-  return true;
+    VkExtensionProperties* available = nullptr;
+    if (VkResult res = vkEnumerateInstanceExtensionProperties( nullptr, &count, available ); res != VK_SUCCESS) {
+        std::fprintf( stderr, "Failed to enumerate Instance Extensions properties. Error code: %d", res );
+    }
+
+    auto* begin = available;
+    auto* end   = available + count;
+
+    for ( const char* name : extensions ) {
+        auto it = std::find_if(
+            begin,
+            end,
+            [name] ( const VkExtensionProperties& extension ) {
+                return std::strcmp( name, extension.extensionName );
+            }
+        );
+
+        if ( it == end ) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static bool CheckRequestedLayers( const std::vector<const char*>& layers ) {
-  uint32_t count = 0;
-  vkEnumerateInstanceLayerProperties( &count, nullptr );
+    uint32_t count = 0;
+    if ( VkResult res = vkEnumerateInstanceLayerProperties( &count, nullptr ); res != VK_SUCCESS ) {
+        std::fprintf( stderr, "Failed to enumerate Instance Layer count. Error code: %d", res );
+    }
 
-  std::vector<VkLayerProperties> available( count );
-  vkEnumerateInstanceLayerProperties( &count, available.data() );
+    VkLayerProperties* available = nullptr;
+    if ( VkResult res = vkEnumerateInstanceLayerProperties( &count, nullptr ); res != VK_SUCCESS ) {
+        std::fprintf( stderr, "Failed to enumerate Instance Layer properties. Error code: %d", res );
+    }
 
-  for ( const char* name : layers) {
-    auto it = std::find_if(
-      available.begin(),
-      available.end(),
-      [name] ( const vk::LayerProperties& layer ) {
-        return std::strcmp( name, layer.layerName.data() );
-      }
-    );
-  }
+    auto* begin = available;
+    auto* end   = available + count;
 
-  return true;
-} 
+    for ( const char* name : layers ) {
+        auto it = std::find_if(
+            begin,
+            end,
+            [name] ( const VkLayerProperties& layer ) {
+                return std::strcmp( name, layer.layerName );
+            }
+        );
+    }
 
-VulkanContext::VulkanContext(GLFWwindow* window_handle) {
-  m_WindowHandle = window_handle;
+    return true;
+}
 
-  vk::ApplicationInfo app_info = {};
-  app_info
-    .setPApplicationName( "Engine" )
-    .setPEngineName( "Engine" )
-    .setApplicationVersion( VK_MAKE_VERSION( 1, 0, 0 ) )
-    .setEngineVersion( VK_MAKE_VERSION( 1, 0, 0 ) )
-    .setApiVersion( vk::ApiVersion10 );
+VulkanContext::VulkanContext( GLFWwindow* window_handle ) {
+    WindowHandle = window_handle;
 
-  vk::InstanceCreateInfo instance_info = {};
-  instance_info
-    .setPApplicationInfo( &app_info )
-    .setEnabledLayerCount( STATIC_CAST( uint32_t, LAYERS.size() ) )
-    .setPpEnabledLayerNames( LAYERS.data() );
+    VkApplicationInfo app_info = {};
+    app_info.pApplicationName = "Engine";
+    app_info.pEngineName = "Engine";
+    app_info.applicationVersion = VK_MAKE_VERSION( 1, 0, 0 );
+    app_info.engineVersion = VK_MAKE_VERSION( 1, 0, 0 );
+    app_info.apiVersion = VK_API_VERSION_1_0;
 
-  auto extensions = GetRequiredExtensions();
-  instance_info
-    .setEnabledExtensionCount( STATIC_CAST( uint32_t, extensions.size() ) )
-    .setPpEnabledExtensionNames( extensions.data() );
+    VkInstanceCreateInfo instance_info = {};
+    instance_info.pApplicationInfo = &app_info;
 
-  m_Instance = vk::createInstance( instance_info );
+    auto extensions = GetRequiredExtensions();
+    instance_info.enabledExtensionCount = STATIC_CAST( uint32_t, extensions.size() );
+    instance_info.ppEnabledExtensionNames = extensions.data();
 }

@@ -10,10 +10,6 @@
 #include "VulkanInstance.h"
 #include "VulkanSurface.h"
 
-struct VulkanDeviceFeatures {
-  std::vector<const char*> Extensions;
-};
-
 struct QueueFamilyIndices {
   std::optional<uint32_t> GraphicsFamily;
   std::optional<uint32_t> PresentFamily;
@@ -25,31 +21,38 @@ struct QueueFamilyIndices {
 
 class VulkanDevice {
 public:
-  void Create( VulkanInstance* instance, const VulkanSurface& surface );
+  struct Features {
+    std::vector<const char*> Extensions;
+  };
 
-  VkPhysicalDevice Physical() const { return m_PhysicalDevice; }
-  VkDevice Logical() const { return m_LogicalDevice; }
+  void Create( VulkanInstance* instance, VulkanSurface* surface );
+
+  VkPhysicalDevice Physical() const { return PhysicalDevice; }
+  VkDevice Logical() const { return LogicalDevice; }
 
   static QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice physical_device,
     VkSurfaceKHR surface );
 
+  const Features& GetFeatures() { return Features; }
+
 private:
   static bool IsDeviceSuitable( VulkanDevice* device, VulkanSurface* surface );
+  static bool CheckDeviceExtensionSupport( VulkanDevice* device );
 
-  void PickPhysicalDevice();
-  void CreateLogicalDevice();
+  void PickPhysical();
+  void CreateLogical();
 
 private:
-  VulkanInstance* m_InstanceHandle = nullptr;
-  VulkanSurface* m_SurfaceHandle = nullptr;
+  VulkanInstance* InstanceHandle = nullptr;
+  VulkanSurface* SurfaceHandle = nullptr;
 
-  VulkanDeviceFeatures m_Features;
+  Features Features;
   
-private:
-  VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
-  VkDevice m_LogicalDevice          = VK_NULL_HANDLE;
-  VkQueue m_GraphicsQueue           = VK_NULL_HANDLE;
-  VkQueue m_PresentQueue            = VK_NULL_HANDLE;
+  VkPhysicalDevice PhysicalDevice = VK_NULL_HANDLE;
+  VkDevice LogicalDevice          = VK_NULL_HANDLE;
+  VkQueue GraphicsQueue           = VK_NULL_HANDLE;
+  VkQueue PresentQueue            = VK_NULL_HANDLE;
 }; 
 
-#endif 
+#endif
+ 

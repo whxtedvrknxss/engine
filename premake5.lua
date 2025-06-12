@@ -1,40 +1,42 @@
 workspace "Engine"
-  architecture "x64"
+    architecture "x64"
 
-  configurations 
-  {
-    "Debug",
-    "Release"
-  }
+    configurations 
+    {
+        "Debug",
+        "Release"
+    }
 
-  startproject "Sandbox"
+    outputdir = "%{cfg.buildcfg}"
 
-outputdir = "%{cfg.architecture}-%{cfg.buildcfg}"
+    VULKAN_SDK = os.getenv("VULKAN_SDK")
 
-group "Core"
-  include "Engine"
-group ""
+    IncludeDir = {}
+    IncludeDir["glm"] = "%{wks.location}/Engine/external/glm"
+    IncludeDir["imgui"] = "%{wks.location}/Engine/external/imgui"
+    IncludeDir["sdl"] = "%{wks.location}/Engine/external/sdl/include"
+    IncludeDir["stb_image"] = "%{wks.location}/Engine/external/stb_image"
+    IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 
-group "Miscellaneous"
-  include "Sandbox"
-group ""
+    LibraryDir = {}
+    LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 
-group "Dependencies"
-  include "Engine/external/glfw"
-  include "Engine/external/imgui"
-group ""
+    Library = {}
+    Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 
-VULKAN_SDK = os.getenv("VULKAN_SDK")
+    startproject "Sandbox"
 
-IncludeDir = {}
-IncludeDir["glfw"] = "%{wks.location}/Engine/external/glfw/include"
-IncludeDir["glm"] = "%{wks.location}/Engine/external/glm"
-IncludeDir["imgui"] = "%{wks.location}/Engine/external/imgui"
-IncludeDir["stb_image"] = "%{wks.location}/Engine/external/stb_image"
-IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
+    group "Core"
+        include "Engine"
+    group ""
 
-LibraryDir = {}
-LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
+    group "Miscellaneous"
+        include "Sandbox"
+        include "Editor"
+    group ""
 
-Library = {}
-Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
+    group "Dependencies"
+        include "Engine/external/imgui"
+        include "Engine/external/sdl"
+    group ""
+

@@ -6,26 +6,25 @@
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Common.h"
 
-struct GLFWwindow;
-
-class WindowsWindow : public Window {
+class WindowsWindow : public WindowBase {
 public:
   WindowsWindow() = delete;
   WindowsWindow( const WindowCreateInfo& create_info );
   ~WindowsWindow() override;
   
 	void OnUpdate() override;
-  virtual void* GetNativeWindow() const { return m_Window; }
+  virtual void* GetNativeWindow() const { return Window; }
 
 private:
-  GLFWwindow* m_Window;
+  SDL_Window* Window;
 
   struct {
     Vec2<uint32_t> Position;
     Vec2<uint32_t> Size;
     std::string    Title;  
     bool           VSync;
-  } m_Data;
+  } Data;
 };
 
 #endif
+

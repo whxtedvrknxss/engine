@@ -9,7 +9,7 @@
   #define ENABLE_ASSERT
 #endif
 
-#define STATIC_CAST(type, value) static_cast<type>(value)
+#define STATIC_CAST(type, value)        static_cast<type>(value)
 
 template< typename Type >
 struct Vec2 {

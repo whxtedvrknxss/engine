@@ -7,3 +7,9 @@
 [submodule "Engine/external/glm"]
 	path = Engine/external/glm
 	url = https://github.com/whxtedvrknxss/glm
+[submodule "Engine/external/sdl"]
+	path = Engine/external/sdl
+	url = https://github.com/whxtedvrknxss/sdl
+[submodule "Engine/external/hidapi"]
+	path = Engine/external/hidapi
+	url = https://github.com/whxtedvrknxss/hidapi

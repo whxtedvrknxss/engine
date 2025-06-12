@@ -1,4 +1,4 @@
-// src/Platform/Vulkan/VulkanSwapchain.h
+// src/Platform/Vulkan/VulkanSwapchain.h 
 
 #ifndef __renderer_vulkan_swapchain_h_included__
 #define __renderer_vulkan_swapchain_h_included__
@@ -7,48 +7,46 @@
 
 #include "VulkanDevice.h"
 
-struct SwapChainSupportDetails {
-  VkSurfaceCapabilitiesKHR Capabilities;
-  std::vector<VkSurfaceFormatKHR> Formats;
-  std::vector<VkPresentModeKHR> PresentModes;
-};
-
 class VulkanSwapchain {
 public:
-  void Create( VulkanDevice* device, VulkanSurface* surface, GLFWwindow* window );
-  void Cleanup();
+    struct Features {
+        VkSurfaceCapabilitiesKHR        Capabilities;
+        std::vector<VkSurfaceFormatKHR> Formats;
+        std::vector<VkPresentModeKHR>   PresentModes;
+    };
 
+    void Create( VulkanDevice* device, VulkanSurface* surface, SDL_Window* window );
+    void Cleanup();
 
-  void Recreate();
+    void Recreate();
 
-  static SwapChainSupportDetails QuerySwapChainSupport(const VulkanDevice* device, 
-    const VulkanSurface* surface);
-
-private:
-  void CreateImageViews();
-
-  static VkImageView CreateImageView( VulkanDevice* device, VkImage image, VkFormat format, VkImageAspectFlags aspect_flags,
-    uint32_t mip_levels );
-
-  VkSurfaceFormatKHR ChooseSwapSurfaceFormat(
-    const std::vector<VkSurfaceFormatKHR>& available ) const;
-  VkPresentModeKHR ChooseSwapPresentMode( const std::vector<VkPresentModeKHR>& available ) const;
-  VkExtent2D ChooseSwapExtent( const VkSurfaceCapabilitiesKHR& capabilities ) const;
+    static Features QuerySwapChainSupport( const VulkanDevice* device,
+        const VulkanSurface* surface );
 
 private:
-  VulkanDevice* m_DeviceHandle = nullptr;
-  VulkanSurface* m_SurfaceHandle = nullptr;
-  GLFWwindow* m_WindowHandle = nullptr;
+    void CreateImageViews();
+    static VkImageView CreateImageView( VulkanDevice* device, VkImage image, VkFormat format,
+        VkImageAspectFlags aspect_flags, uint32_t mip_levels );
+
+    VkSurfaceFormatKHR ChooseSwapSurfaceFormat(
+        const std::vector<VkSurfaceFormatKHR>& available ) const;
+    VkPresentModeKHR ChooseSwapPresentMode( const std::vector<VkPresentModeKHR>& available ) const;
+    VkExtent2D ChooseSwapExtent( const VkSurfaceCapabilitiesKHR& capabilities ) const;
 
 private:
-  VkSwapchainKHR m_Swapchain = VK_NULL_HANDLE;
-  VkExtent2D m_Extent;
-  
-  std::vector<VkImage> m_Images;
-  std::vector<VkImageView> m_ImageViews;
-  VkFormat m_ImageFormat;
+    VulkanDevice* DeviceHandle = nullptr;
+    VulkanSurface* SurfaceHandle = nullptr;
+    SDL_Window* WindowHandle = nullptr;
 
-  std::vector<VkFramebuffer> m_Framebuffers;
+private:
+    VkSwapchainKHR Swapchain = VK_NULL_HANDLE;
+    VkExtent2D Extent = {};
+
+    std::vector<VkImage> Images;
+    std::vector<VkImageView> ImageViews;
+    VkFormat ImageFormat = VK_FORMAT_UNDEFINED;
+
+    std::vector<VkFramebuffer> Framebuffers;
 
 };
 

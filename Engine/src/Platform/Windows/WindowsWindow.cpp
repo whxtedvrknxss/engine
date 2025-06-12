@@ -1,22 +1,19 @@
 #include "WindowsWindow.h"
 
-#include <GLFW/glfw3.h>
-
 WindowsWindow::WindowsWindow( const WindowCreateInfo& create_info ) {
-  m_Data.Position = create_info.Position;
-  m_Data.Size = create_info.Size;
-  m_Data.Title = create_info.Title;
+    Data.Position = create_info.Position;
+    Data.Size = create_info.Size;
+    Data.Title = create_info.Title;
 
-  glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-  m_Window = glfwCreateWindow( m_Data.Size.X, m_Data.Size.Y, m_Data.Title.c_str(), 
-    nullptr, nullptr );
+    Window = SDL_CreateWindow( Data.Title.c_str(), STATIC_CAST( int32_t, Data.Size.X ),
+        STATIC_CAST( int32_t, Data.Size.Y ), SDL_WINDOW_VULKAN );
 }
 
 WindowsWindow::~WindowsWindow() {
-  glfwDestroyWindow( m_Window );
+    SDL_DestroyWindow( Window );
 }
 
 void WindowsWindow::OnUpdate() {
-  //glfwSwapBuffers( m_Window );
+  //glfwSwapBuffers( Window );
 }
 

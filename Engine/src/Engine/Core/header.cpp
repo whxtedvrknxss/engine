@@ -4,41 +4,39 @@
 #include <iostream>
 
 #include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
-
-#include "Assert.h"
+#include <SDL3/SDL.h>
 
 void show_window() {
-  glfwInit();
-
-  glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-  GLFWwindow *window = glfwCreateWindow( 800, 600, "vulkan window", nullptr, nullptr );
-
-  glfwSetDropCallback( window, [] ( GLFWwindow* window, int count, const char* paths[] ) {
-    for ( int i = 0; i < count; i++ ) {
-      std::printf( "%s\n", paths[i] );
-      glfwSetClipboardString( window, paths[i] );
+    if ( !SDL_Init( SDL_INIT_VIDEO ) ) {
+        SDL_Log( "error initializing SDL! error message: %s\n", SDL_GetError() );
+        __debugbreak();
     }
-  });
 
-  glfwShowWindow( window );
 
-  ASSERT( false && "gabela ahaahhah" );
+    SDL_Window* window = SDL_CreateWindow( "title", 700, 600, 0 );
 
-  glm::mat4 matrix;
-  glm::vec4 vec;
-  auto test = matrix * vec;
+    if ( !window ) {
+        SDL_Log( "window has not been created! error message: %s\n", SDL_GetError() );
+        __debugbreak();
+    }
 
-  while ( !glfwWindowShouldClose( window ) ) {
-    glfwPollEvents();
-  }
+    SDL_Surface* surface = SDL_GetWindowSurface( window );
 
-  glfwDestroyWindow( window );
-  glfwTerminate();
+    bool running = true;
+    while ( running ) {
+        SDL_Event e;
+        while ( SDL_PollEvent( &e ) == true ) {
+            if ( e.type == SDL_EVENT_QUIT ) {
+                running = false;
+            }
+        }
+        SDL_FillSurfaceRect( surface, nullptr, SDL_MapSurfaceRGB( surface, 0x19, 0x19, 0x19 ) );
+
+        SDL_UpdateWindowSurface( window );
+    }
+
+    SDL_DestroySurface( surface );
+    SDL_DestroyWindow( window );
+    SDL_Quit();
 }
 

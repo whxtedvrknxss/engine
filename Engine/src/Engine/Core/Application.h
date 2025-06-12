@@ -9,7 +9,7 @@
 #include "Common.h"
 
 class Application {
-  Scope<Window> m_Window;
+    Scope<WindowBase> Window { nullptr };
 
 public:
   Application();

@@ -2,15 +2,13 @@ project "Engine"
   language "C++"
   kind "StaticLib"
   cppdialect "C++20"
-  staticruntime "off"
 
   targetdir ("%{wks.location}/build/bin/" .. outputdir .. "/%{prj.name}")
   objdir ("%{wks.location}/build/obj/" .. outputdir .. "/%{prj.name}")
 
   defines 
   {
-    "_CRT_SECURE_NO_WARNINGS",
-    "GLFW_INCLUDE_NONE"
+    "_CRT_SECURE_NO_WARNINGS"
   }
   
   files 
@@ -22,24 +20,27 @@ project "Engine"
   includedirs 
   {
     "src",
-    "%{IncludeDir.glfw}",
-    "%{IncludeDir.glm}",
-    "%{IncludeDir.imgui}",
-    "%{IncludeDir.stb_image}",
-    "%{IncludeDir.VulkanSDK}"
+    IncludeDir["glm"],
+    IncludeDir["imgui"],
+    IncludeDir["stb_image"],
+    IncludeDir["VulkanSDK"],
+    IncludeDir["sdl"]
   }
 
   links 
   {
-    "glfw",
     "imgui",
-    "%{Library.Vulkan}"
+    "sdl",
+    Library["Vulkan"]
   }
 
   systemversion "latest"
 
   filter "system:Windows"
-    defines "PLATFORM_WINDOWS"
+    defines 
+    {
+        "PLATFORM_WINDOWS"
+    }
 
     files
     {

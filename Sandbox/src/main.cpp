@@ -3,7 +3,7 @@
 #include <Engine/Core/header.h>
 
 int main( int argc, char *argv[] ) {
-  show_window();
+    show_window();
 
-  return 0;
+    return 0;
 }

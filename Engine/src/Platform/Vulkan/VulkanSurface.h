@@ -7,19 +7,19 @@
 
 #include "VulkanInstance.h"
 
-struct GLFWwindow;
+struct SDL_Window;
 
 class VulkanSurface {
 public:
-  void Create( const VulkanInstance& instance, GLFWwindow* window );
+    void Create( VulkanInstance* instance, SDL_Window* window );
   void Cleanup();
 
-  VkSurfaceKHR Get() const { return m_Surface; }
+  VkSurfaceKHR Get() const { return Surface; }
 
 private:
-  VkSurfaceKHR m_Surface;
+  VkSurfaceKHR Surface = VK_NULL_HANDLE;
 
-  VulkanInstance& m_InstanceHandle;
+  VulkanInstance* InstanceHandle = nullptr;
 };
 
 #endif 

@@ -2,20 +2,17 @@
 
 #include <stdexcept>
 
-#include "GLFW/glfw3.h"
+#include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
-#include "Engine/Core/Common.h"
+void VulkanSurface::Create(VulkanInstance* instance, SDL_Window* window) {
+  InstanceHandle = instance;
 
-void VulkanSurface::Create(const VulkanInstance& instance, GLFWwindow* window) {
-  m_InstanceHandle = instance;
-
-  if ( VkResult res = glfwCreateWindowSurface( m_InstanceHandle.Get(), window, nullptr,
-      &m_Surface ); res != VK_SUCCESS ) {
+  if ( SDL_Vulkan_CreateSurface( window, instance->Get(), nullptr, &Surface ) ) {
     throw std::runtime_error( "error creating Vulkan instance!" );
   }
 }
 
 void VulkanSurface::Cleanup( ) {
-  vkDestroySurfaceKHR( m_InstanceHandle.Get(), m_Surface, nullptr );
+  vkDestroySurfaceKHR( InstanceHandle->Get(), Surface, nullptr );
 }

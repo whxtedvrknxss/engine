@@ -1,4 +1,4 @@
-project "Sandbox"
+project "Editor"
   kind "ConsoleApp"
   language "C++"
   cppdialect "C++20"
@@ -15,21 +15,20 @@ project "Sandbox"
   includedirs 
   {
     "%{wks.location}/Engine/src",
-    "%{wks.location}/Engine/external",
-    "%{IncludeDir.glm}"
+    "%{wks.location}/Engine/external"
   }
 
-  links
+  links 
   {
     "Engine"
   }
 
   systemversion "latest"
 
-  filter "configurations:Debug"
+  filter  "configurations:Debug"
     defines "DEBUG"
     runtime "Debug"
-    symbols "on"
+    symbols "On"
 
   filter "configurations:Release"
     defines "RELEASE"

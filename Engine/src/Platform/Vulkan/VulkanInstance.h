@@ -7,31 +7,31 @@
 
 #include <vulkan/vulkan.h>
 
-struct VulkanInstanceFeatures {
-  std::vector<const char*> Extensions;
-  std::vector<const char*> Layers;
-};
-
 class VulkanInstance {
 public:
+  struct Features {
+    std::vector<const char*> Extensions;
+    std::vector<const char*> Layers;
+  };
+
   void Create( bool enable_validation = true );
   void Cleanup();
 
-  VkInstance Get() const { return m_Instance; }
+  VkInstance Get() const { return Instance; }
 
-  const VulkanInstanceFeatures& GetFeatures() const { return m_Features; }
+  const Features& GetFeatures() const { return Features; }
 
 private:
   std::vector<const char*> GetRequiredExtensions() const;
   bool CheckExtensionSupport() const;
 
 private:
-  VulkanInstanceFeatures m_Features;
+  Features Features;
 
-  bool m_EnableValidation;
+  bool EnableValidation;
 
-  VkInstance m_Instance;
-  VkDebugUtilsMessengerEXT m_DebugMessenger;
+  VkInstance Instance;
+  VkDebugUtilsMessengerEXT DebugMessenger;
 }; 
 
 #endif 
