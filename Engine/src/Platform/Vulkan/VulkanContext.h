@@ -6,11 +6,11 @@
 #include "VulkanInstance.h"
 #include "Engine/Renderer/GraphicsContext.h"
 
-struct GLFWwindow;
+struct SDL_Window;
 
 class VulkanContext : public GraphicsContext {
 public:
-    VulkanContext( GLFWwindow* window_handle );
+    VulkanContext( SDL_Window* window_handle );
     void Init() override {}
     void BeginFrame() override {}
     void EndFrame() override {}
@@ -18,7 +18,7 @@ public:
     void SwapBuffers() override {}
 
 private:
-    GLFWwindow* WindowHandle;
+    SDL_Window* WindowHandle;
 
     VulkanInstance Instance;
 };

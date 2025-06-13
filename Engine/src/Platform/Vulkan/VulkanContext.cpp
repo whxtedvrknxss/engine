@@ -19,12 +19,12 @@ static std::vector<const char*> GetRequiredExtensions() {
 static bool CheckRequestedExtensions( const std::vector<const char*>& extensions ) {
     uint32_t count = 0;
     if ( VkResult res = vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr ); res != VK_SUCCESS ) {
-        std::fprintf( stderr, "Failed to enumerate Instance Extensions count. Error code: %d", res );
+        fprintf( stderr, "Failed to enumerate Instance Extensions count. Error code: %d", res );
     }
 
     VkExtensionProperties* available = nullptr;
     if (VkResult res = vkEnumerateInstanceExtensionProperties( nullptr, &count, available ); res != VK_SUCCESS) {
-        std::fprintf( stderr, "Failed to enumerate Instance Extensions properties. Error code: %d", res );
+        fprintf( stderr, "Failed to enumerate Instance Extensions properties. Error code: %d", res );
     }
 
     auto* begin = available;
@@ -74,7 +74,7 @@ static bool CheckRequestedLayers( const std::vector<const char*>& layers ) {
     return true;
 }
 
-VulkanContext::VulkanContext( GLFWwindow* window_handle ) {
+VulkanContext::VulkanContext( SDL_Window* window_handle ) {
     WindowHandle = window_handle;
 
     VkApplicationInfo app_info = {};

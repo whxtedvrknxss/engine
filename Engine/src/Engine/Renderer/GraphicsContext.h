@@ -3,6 +3,7 @@
 #ifndef __renderer_graphics_context_h_included__
 #define __renderer_graphics_context_h_included__
 
+#include "RendererAPI.h"
 #include "Engine/Core/Common.h"
 
 class GraphicsContext {
@@ -17,7 +18,7 @@ public:
 
   virtual void SwapBuffers() = 0;
 
-  Scope<GraphicsContext> Create( void* window );
+  Scope<GraphicsContext> Create( void* window, GraphicsBackend api );
 };
 
 #endif 
