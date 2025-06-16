@@ -18,7 +18,7 @@ public:
 
   virtual void SwapBuffers() = 0;
 
-  Scope<GraphicsContext> Create( void* window, GraphicsBackend api );
+  static Scope<GraphicsContext> Create( void* window, GraphicsBackend api );
 };
 
 #endif 

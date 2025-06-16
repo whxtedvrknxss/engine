@@ -8,9 +8,18 @@
 
 struct SDL_Window;
 
+struct VulkanContextCreateInfo {
+    int32 VulkanApiMajorVersion;
+    int32 VulkanApiMinorVersion;
+    std::vector<const char*> Extensions;
+    std::vector<const char*> Layers;
+    const char* ApplicationName;
+    const char* EngineName;
+};
+
 class VulkanContext : public GraphicsContext {
 public:
-    VulkanContext( SDL_Window* window_handle );
+    VulkanContext( const VulkanContextCreateInfo& context_info, SDL_Window* window );
     void Init() override {}
     void BeginFrame() override {}
     void EndFrame() override {}

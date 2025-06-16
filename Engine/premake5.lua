@@ -13,13 +13,13 @@ project "Engine"
   
   files 
   {
-    "src/Engine/**.h",
-    "src/Engine/**.cpp"
+    "Source/Engine/**.h",
+    "Source/Engine/**.cpp"
   }
 
   includedirs 
   {
-    "src",
+    "Source",
     IncludeDir["glm"],
     IncludeDir["imgui"],
     IncludeDir["stb_image"],
@@ -39,15 +39,16 @@ project "Engine"
   filter "system:Windows"
     defines 
     {
-        "PLATFORM_WINDOWS"
+        "PLATFORM_WINDOWS",
+        "VULKAN_SUPPORTED"
     }
 
     files
     {
-      "src/Platform/Windows/**.h",
-      "src/Platform/Windows/**.cpp",
-      "src/Platform/Vulkan/**.h",
-      "src/Platform/Vulkan/**.cpp"
+      "Source/Platform/Windows/**.h",
+      "Source/Platform/Windows/**.cpp",
+      "Source/Platform/Vulkan/**.h",
+      "Source/Platform/Vulkan/**.cpp"
     }
 
   filter "configurations:Debug"

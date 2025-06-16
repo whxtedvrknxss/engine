@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanDevice.h"
+#include "VulkanSurface.h"
 
 class VulkanSwapchain {
 public:

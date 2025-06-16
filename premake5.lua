@@ -1,5 +1,6 @@
 workspace "Engine"
     architecture "x64"
+    startproject "Sandbox"
 
     configurations 
     {
@@ -24,19 +25,14 @@ workspace "Engine"
     Library = {}
     Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 
-    startproject "Sandbox"
-
     group "Core"
         include "Engine"
-    group ""
 
     group "Miscellaneous"
         include "Sandbox"
         include "Editor"
-    group ""
 
     group "Dependencies"
         include "Engine/external/imgui"
         include "Engine/external/sdl"
-    group ""
 

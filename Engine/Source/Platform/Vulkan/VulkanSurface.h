@@ -12,14 +12,14 @@ struct SDL_Window;
 class VulkanSurface {
 public:
     void Create( VulkanInstance* instance, SDL_Window* window );
-  void Cleanup();
+    void Cleanup();
 
-  VkSurfaceKHR Get() const { return Surface; }
+    VkSurfaceKHR Get() const { return Surface; }
 
 private:
-  VkSurfaceKHR Surface = VK_NULL_HANDLE;
+    VkSurfaceKHR Surface = VK_NULL_HANDLE;
 
-  VulkanInstance* InstanceHandle = nullptr;
+    VulkanInstance* InstanceHandle = nullptr;
 };
 
 #endif 

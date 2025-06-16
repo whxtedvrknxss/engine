@@ -4,12 +4,10 @@
 #define __renderer_renderer_api_h_included__
 
 enum class GraphicsBackend {
-    None      = 0,
-    Vulkan    = 1,
-    OpenGL    = 2,
-    DirectX9  = 3,
-    DirectX11 = 4,
-    DirectX12 = 5,
+    None = 0,
+    Vulkan,
+    DirectX12,
+    OpenGL,
 };
 
 class RendererAPI {

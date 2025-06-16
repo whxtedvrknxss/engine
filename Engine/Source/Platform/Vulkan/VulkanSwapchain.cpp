@@ -40,15 +40,15 @@ void VulkanSwapchain::Create( VulkanDevice* device, VulkanSurface* surface,
     swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     swapchain_info.clipped = true;
 
-    QueueFamilyIndices queue_families = VulkanDevice::FindQueueFamilies(
-        DeviceHandle->Physical(), SurfaceHandle->Get() );
+    QueueFamiliesIndices queue_families = VulkanDevice::FindQueueFamilies(
+        DeviceHandle->GetPhysical() );
 
     uint32_t indices[] = {
-      queue_families.GraphicsFamily.value(),
-      queue_families.PresentFamily.value()
+      queue_families.Graphics.value(),
+      queue_families.Present.value()
     };
 
-    if ( queue_families.GraphicsFamily != queue_families.PresentFamily ) {
+    if ( queue_families.Graphics != queue_families.Present ) {
         swapchain_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         swapchain_info.queueFamilyIndexCount = 2;
         swapchain_info.pQueueFamilyIndices = indices;
@@ -56,14 +56,14 @@ void VulkanSwapchain::Create( VulkanDevice* device, VulkanSurface* surface,
         swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
-    if ( VkResult res = vkCreateSwapchainKHR( DeviceHandle->Logical(), &swapchain_info, nullptr,
+    if ( VkResult res = vkCreateSwapchainKHR( DeviceHandle->GetLogical(), &swapchain_info, nullptr,
         &Swapchain ); res != VK_SUCCESS ) {
         throw std::runtime_error(  "failed to create swapchain! error code: " );
     }
 
-    vkGetSwapchainImagesKHR( DeviceHandle->Logical(), Swapchain, &image_count, nullptr );
+    vkGetSwapchainImagesKHR( DeviceHandle->GetLogical(), Swapchain, &image_count, nullptr );
     Images.resize( image_count );
-    vkGetSwapchainImagesKHR( DeviceHandle->Logical(), Swapchain, &image_count, Images.data() );
+    vkGetSwapchainImagesKHR( DeviceHandle->GetLogical(), Swapchain, &image_count, Images.data() );
 
     ImageFormat = surface_format.format;
     Extent = extent;
@@ -75,10 +75,10 @@ void VulkanSwapchain::Cleanup() {
 
 
     for ( auto& image_view : ImageViews ) {
-        vkDestroyImageView( DeviceHandle->Logical(), image_view, nullptr );
+        vkDestroyImageView( DeviceHandle->GetLogical(), image_view, nullptr );
     }
 
-    vkDestroySwapchainKHR( DeviceHandle->Logical(), Swapchain, nullptr );
+    vkDestroySwapchainKHR( DeviceHandle->GetLogical(), Swapchain, nullptr );
 }
 
 void VulkanSwapchain::Recreate() {
@@ -91,7 +91,7 @@ void VulkanSwapchain::Recreate() {
         SDL_WaitEvent( &event );
     }
 
-    vkDeviceWaitIdle( DeviceHandle->Logical() );
+    vkDeviceWaitIdle( DeviceHandle->GetLogical() );
 
     Create( DeviceHandle, SurfaceHandle, WindowHandle );
     CreateImageViews();
@@ -103,26 +103,26 @@ void VulkanSwapchain::Recreate() {
 VulkanSwapchain::Features VulkanSwapchain::QuerySwapChainSupport( const VulkanDevice* device,
     const VulkanSurface* surface ) {
     Features features;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device->Physical(), surface->Get(),
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device->GetPhysical(), surface->Get(),
         &features.Capabilities );
 
     uint32_t format_count = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR( device->Physical(), surface->Get(),
+    vkGetPhysicalDeviceSurfaceFormatsKHR( device->GetPhysical(), surface->Get(),
         &format_count, nullptr );
 
     if ( format_count != 0 ) {
         features.Formats.resize( format_count );
-        vkGetPhysicalDeviceSurfaceFormatsKHR( device->Physical(), surface->Get(),
+        vkGetPhysicalDeviceSurfaceFormatsKHR( device->GetPhysical(), surface->Get(),
             &format_count, features.Formats.data() );
     }
 
     uint32_t present_modes_count = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR( device->Physical(), surface->Get(),
+    vkGetPhysicalDeviceSurfaceFormatsKHR( device->GetPhysical(), surface->Get(),
         &present_modes_count, nullptr );
 
     if ( present_modes_count != 0 ) {
         features.PresentModes.resize( present_modes_count );
-        vkGetPhysicalDeviceSurfacePresentModesKHR( device->Physical(),
+        vkGetPhysicalDeviceSurfacePresentModesKHR( device->GetPhysical(),
             surface->Get(), &present_modes_count, features.PresentModes.data() );
     }
 
@@ -153,7 +153,7 @@ VkImageView VulkanSwapchain::CreateImageView( VulkanDevice* device, VkImage imag
     image_view_info.subresourceRange = subresource;
 
     VkImageView image_view;
-    if ( VkResult res = vkCreateImageView( device->Logical(), &image_view_info, nullptr,
+    if ( VkResult res = vkCreateImageView( device->GetLogical(), &image_view_info, nullptr,
         &image_view ); res != VK_SUCCESS ) {
         throw std::runtime_error(
             "failed to create texture image view! error code "

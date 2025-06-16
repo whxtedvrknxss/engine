@@ -14,7 +14,7 @@ project "Sandbox"
 
   includedirs 
   {
-    "%{wks.location}/Engine/src",
+    "%{wks.location}/Engine/Source",
     "%{wks.location}/Engine/external",
     "%{IncludeDir.glm}"
   }
