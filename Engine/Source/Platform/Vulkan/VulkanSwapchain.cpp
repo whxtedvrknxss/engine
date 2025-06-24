@@ -40,21 +40,8 @@ void VulkanSwapchain::Create( VulkanDevice* device, VulkanSurface* surface,
     swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     swapchain_info.clipped = true;
 
-    QueueFamiliesIndices queue_families = VulkanDevice::FindQueueFamilies(
-        DeviceHandle->GetPhysical() );
-
-    uint32_t indices[] = {
-      queue_families.Graphics.value(),
-      queue_families.Present.value()
-    };
-
-    if ( queue_families.Graphics != queue_families.Present ) {
-        swapchain_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        swapchain_info.queueFamilyIndexCount = 2;
-        swapchain_info.pQueueFamilyIndices = indices;
-    } else {
-        swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
+    //QueueFamiliesIndices queue_families = VulkanDevice::FindQueueFamilies(
+     //   DeviceHandle->GetPhysical() );
 
     if ( VkResult res = vkCreateSwapchainKHR( DeviceHandle->GetLogical(), &swapchain_info, nullptr,
         &Swapchain ); res != VK_SUCCESS ) {

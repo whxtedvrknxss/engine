@@ -1,48 +1,71 @@
 #include "VulkanDevice.h"
 
 #include "VulkanCall.h"
+#include "VulkanSurface.h"
 
 #include "Engine/Core/Log.h"
 #include "Engine/Core/Common.h"
 
-void VulkanDevice::Create( const VulkanContextCreateInfo& context_info, VulkanInstance* instance ) {
+void VulkanDevice::Create( const VulkanContextCreateInfo& context_info, VulkanInstance* instance, 
+    VulkanSurface* surface_handle ) {
     PickPhysicalDevice();
-
-    const VulkanContextCreateInfo*  ptr = &context_info;
+    CreateLogicalDevice();
 }
 
 void VulkanDevice::Cleanup() {
     vkDestroyDevice(Logical, nullptr);
 }
 
-void VulkanDevice::PickPhysicalDevice() {
-    uint32 device_count = 0;
-    VK_CALL( vkEnumeratePhysicalDevices( InstanceHandle->Get(), &device_count, nullptr ) );
+void VulkanDevice::FindQueueFamilies( VkSurfaceKHR surface ) {
+    uint32 count = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties( Physical, &count, nullptr );
 
-    if ( device_count == 0 ) {
-        LOG_ERROR( "Failed to find GPUs with Vulkan support" );
-        throw std::runtime_error( "no gpu available" );
+    VkQueueFamilyProperties* properties = nullptr;
+    vkGetPhysicalDeviceQueueFamilyProperties( Physical, &count, properties);
+
+    for ( uint32 i = 0; i < count; ++i ) {
+        if ( properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) {
+            QueueFamilies.Graphics = i;
+        }
+
+        VkBool32 present_support = VK_FALSE;
+        vkGetPhysicalDeviceSurfaceSupportKHR( Physical, i, surface, &present_support );
+
+        if ( present_support ) {
+            QueueFamilies.Present = i;
+        }
+
+        if ( QueueFamilies.IsComplete() ) {
+            break;
+        }
     }
+}
 
-    VkPhysicalDevice* devices = nullptr;
-    VK_CALL( vkEnumeratePhysicalDevices( InstanceHandle->Get(), &device_count, devices ) );
+void VulkanDevice::PickPhysicalDevice() {
+    uint32 gpu_count = 0;
+    vkEnumeratePhysicalDevices( InstanceHandle->Get(), &gpu_count, nullptr );
 
-    for ( int32 i = 0; i < device_count; ++i ) {
-        if ( CheckPhysicalDevice( devices[i] ) ) {
-            Physical = devices[i];
+    std::vector<VkPhysicalDevice> gpus( gpu_count );
+    vkEnumeratePhysicalDevices( InstanceHandle->Get(), &gpu_count, gpus.data() );
+
+    for ( const auto gpu : gpus ) {
+        VkPhysicalDeviceProperties gpu_props = {};
+        vkGetPhysicalDeviceProperties( gpu, &gpu_props );
+
+        if ( gpu_props.deviceType & VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
+            //return gpu;
         }
     }
 
-    if ( Physical == VK_NULL_HANDLE ) {
-        LOG_ERROR( "Failed to find GPU with necessary features" );
-        throw std::runtime_error( "no gpu features available" );
+    if ( gpu_count > 0 ) {
+        //return gpus[0];
     }
 
-    // TODO: rate devices by suitability
+    //return VK_NULL_HANDLE;
 }
 
 void VulkanDevice::CreateLogicalDevice() {
-    QueueFamiliesIndices indices = FindQueueFamilies( Physical );
+    QueueFamilyIndices indices;//FindQueueFamilies( Physical );
 
     VkDeviceQueueCreateInfo queue_info = {};
     queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -80,24 +103,3 @@ bool VulkanDevice::CheckPhysicalDevice( VkPhysicalDevice device ) {
     // TODO: replace by RateDevice function 
 }
 
-QueueFamiliesIndices VulkanDevice::FindQueueFamilies( VkPhysicalDevice device ) {
-    QueueFamiliesIndices indices;
-
-    uint32 count = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties( device, &count, nullptr );
-
-    VkQueueFamilyProperties* properties = nullptr;
-    vkGetPhysicalDeviceQueueFamilyProperties( device, &count, properties);
-
-    for ( uint32 i = 0; i < count; ++i ) {
-        if ( properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) {
-            indices.Graphics = i;
-        }
-
-        if ( indices.IsComplete() ) {
-            break;
-        }
-    }
-    
-    return indices;
-}

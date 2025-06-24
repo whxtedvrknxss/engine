@@ -1,12 +1,11 @@
 #include "GraphicsContext.h"
 
-#include <SDL3/SDL_vulkan.h>
-
 #include "RendererAPI.h"
 #include "Engine/Core/Assert.h"
 
 #if defined( VULKAN_SUPPORTED )
 #include "Platform/Vulkan/VulkanContext.h"
+#include <SDL3/SDL_vulkan.h>
 #endif 
 
 Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend api ) {
@@ -23,7 +22,7 @@ Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend ap
                 .Extensions = std::vector( extensions, extensions + extensions_count ),
                 .Layers = { "VK_LAYER_KHRONOS_validation" },
                 .ApplicationName = "application_name",
-                .EngineName = "engine_name" 
+                .EngineName = "engine_name"
             };
 
             return CreateScope<VulkanContext>( context_info, STATIC_CAST( SDL_Window*, window ) );
