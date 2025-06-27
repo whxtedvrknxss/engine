@@ -396,7 +396,6 @@ void show_window() {
     font_config.PixelSnapH = false;
 
     io.Fonts->AddFontFromFileTTF( "c:\\windows\\fonts\\lucon.ttf", 15.0f, &font_config );
-    ImGuiFreeType::
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();

@@ -6,7 +6,7 @@
 
 #include <SDL3/SDL_log.h>
 
-#define LOG_INFO(...)               SDL_Log(std::format(__VA_ARGS__).c_str())
-#define LOG_ERROR(...)              SDL_Log(std::format(__VA_ARGS__).c_str())
+#define LOG_INFO(...)               SDL_Log( std::format("[INFO] {}", std::format(__VA_ARGS__)).c_str() )
+#define LOG_ERROR(...)              SDL_Log( std::format("[ERROR] {}", std::format(__VA_ARGS__)).c_str() )
 
 #endif 
