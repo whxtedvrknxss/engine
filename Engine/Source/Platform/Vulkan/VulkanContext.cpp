@@ -112,6 +112,12 @@ void VulkanContext::Init()
     vkDestroyShaderModule( Device, vertex, nullptr );
     vkDestroyShaderModule( Device, fragment, nullptr );
 
+    Framebuffers = CreateFramebuffers();
+    if ( Framebuffers.size() == 0 )
+    {
+        throw std::runtime_error( "Framebuffers.size == 0" );
+    }
+
     CommandPool = CreateCommandPool( indices );
     if ( CommandPool == VK_NULL_HANDLE )
     {
@@ -787,6 +793,7 @@ VulkanGraphicsPipeline VulkanContext::CreateGraphicsPipeline( VkShaderModule ver
         );
         return {};
     }
+    return graphics_pipeline;
 }
 
 

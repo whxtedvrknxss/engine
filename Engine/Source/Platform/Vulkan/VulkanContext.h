@@ -46,7 +46,7 @@ struct VulkanGraphicsPipeline
 {
     VkRenderPass     RenderPass;
     VkPipelineLayout Layout;
-    VkPipeline       Handle;
+    VkPipeline       Instance;
 };
 
 struct VulkanSyncObjects
