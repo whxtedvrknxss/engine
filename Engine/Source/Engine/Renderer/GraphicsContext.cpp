@@ -11,10 +11,13 @@
 #include "Platform/Vulkan/VulkanContext.h"
 #endif 
 
-Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend api ) {
-    switch ( api ) {
+Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend api )
+{
+    switch ( api )
+    {
 #if defined ( VULKAN_SUPPORTED )
-        case GraphicsBackend::Vulkan: {
+        case GraphicsBackend::Vulkan:
+        {
             uint32 extensions_count = 0;
             char const* const* extensions = SDL_Vulkan_GetInstanceExtensions( &extensions_count );
 
@@ -32,10 +35,11 @@ Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend ap
         } break;
 #endif
 
-        default: {
+        default:
+        {
             ASSERT( false, "Platform is not supported" );
         } break;
     }
 
-  return nullptr;
+    return nullptr;
 }

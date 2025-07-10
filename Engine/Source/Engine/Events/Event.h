@@ -1,10 +1,10 @@
-// Engine/src/Events/Event.h
+// Engine/Source/Events/Event.h
 
 #ifndef __events_event_h__
 #define __events_event_h__
 
-class Event {
-  
+class Event 
+{
 };
 
 #endif 

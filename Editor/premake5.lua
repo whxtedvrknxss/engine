@@ -8,19 +8,20 @@ project "Editor"
 
   files 
   {
-    "src/**.h",
-    "src/**.cpp"
+    "Source/**.h",
+    "Source/**.cpp"
   }
 
   includedirs 
   {
-    "%{wks.location}/Engine/src",
-    "%{wks.location}/Engine/external"
+    "%{wks.location}/Engine/Source",
+    "%{wks.location}/Engine/external/imgui"
   }
 
   links 
   {
-    "Engine"
+    "Engine",
+    "imgui"
   }
 
   systemversion "latest"

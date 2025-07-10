@@ -10,21 +10,23 @@
 
 #include <SDL3/SDL.h>
 
-struct WindowCreateInfo {
-  Vec2<uint32_t> Position;
-  Vec2<uint32_t> Size;
-  std::string    Title;
+struct WindowCreateInfo
+{
+    Vec2<uint32_t> Position;
+    Vec2<uint32_t> Size;
+    std::string    Title;
 };
 
-class WindowBase {
+class WindowBase
+{
 public:
-  virtual ~WindowBase() = default;
-  
-  virtual void OnUpdate() = 0;
+    virtual ~WindowBase() = default;
 
-  virtual void* GetNativeWindow() const = 0;
- 
-  static std::unique_ptr<WindowBase> Create( const WindowCreateInfo& create_info );
+    virtual void OnUpdate() = 0;
+
+    virtual void* GetNativeWindow() const = 0;
+
+    static std::unique_ptr<WindowBase> Create( const WindowCreateInfo& create_info );
 };
 
 #endif 

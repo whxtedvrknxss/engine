@@ -7,15 +7,18 @@
 
 #include "Window.h"
 #include "Common.h"
+#include "Engine/Renderer/GraphicsContext.h"
 
-class Application {
-    Scope<WindowBase> Window { nullptr };
-
+class Application
+{
 public:
-  Application();
-  ~Application();
+    Application();
+    ~Application();
 
+    int32 Run();
 
+private:
+    Scope<WindowBase> Window;
 };
 
 #endif 

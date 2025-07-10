@@ -2,7 +2,8 @@
 
 #include <fstream>
 
-std::vector<char> GetShaderSource( const std::filesystem::path& path ) {
+std::vector<char> GetShaderSource( const std::filesystem::path& path )
+{
     std::ifstream file( path, std::ios::ate | std::ios::binary );
 
     if ( !file.is_open() ) {
@@ -18,3 +19,4 @@ std::vector<char> GetShaderSource( const std::filesystem::path& path ) {
 
     return buffer;
 }
+
