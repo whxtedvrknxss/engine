@@ -37,7 +37,7 @@ Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend ap
 
         default:
         {
-            ASSERT( false, "Platform is not supported" );
+            ASSERT( false &&  "Platform is not supported" );
         } break;
     }
 

@@ -13,7 +13,7 @@ WindowsWindow::WindowsWindow( const WindowCreateInfo& create_info )
     Window = SDL_CreateWindow( 
         Data.Title.c_str(), 
         x, y,
-        SDL_WINDOW_VULKAN 
+        SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE
     );
 
     Context = GraphicsContext::Create( Window, GraphicsBackend::Vulkan );
@@ -23,10 +23,6 @@ WindowsWindow::WindowsWindow( const WindowCreateInfo& create_info )
         Context->Init();
     }
     catch ( const std::exception& ex )
-    {
-        LOG_INFO( "{}", ex.what());
-    }
-    catch ( const std::runtime_error& ex )
     {
         LOG_INFO( "{}", ex.what());
     }
@@ -48,10 +44,6 @@ void WindowsWindow::OnUpdate()
     catch ( const std::exception& ex )
     {
         LOG_INFO( "{}", ex.what());
-    }
-    catch ( const std::runtime_error& ex )
-    {
-        LOG_INFO( "{}", ex.what() );
     }
 }
 

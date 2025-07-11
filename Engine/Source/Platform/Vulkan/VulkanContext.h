@@ -51,9 +51,15 @@ struct VulkanGraphicsPipeline
 
 struct VulkanSyncObjects
 {
-    VkSemaphore ImageAvailableSemaphore;
-    VkSemaphore RenderFinishedSemaphore;
-    VkFence     InFlightFence;
+    std::vector<VkSemaphore> ImageAvailableSemaphores;
+    std::vector<VkSemaphore> RenderFinishedSemaphores;
+    std::vector<VkFence> InFlightFences;
+};
+
+struct VulkanBuffer
+{
+    VkBuffer       Instance;
+    VkDeviceMemory Memory;
 };
 
 class VulkanContext : public GraphicsContext
@@ -91,7 +97,10 @@ private:
     VkPhysicalDevice SelectPhysicalDevice();
     VkDevice         CreateDevice( QueueFamilyIndices indices );
     VkQueue          GetQueue( uint32 family_index, uint32 index );
+
     VulkanSwapchain  CreateSwapchain();
+    void CleanupSwapchain();
+    void RecreateSwapchain();
 
     VkShaderModule         CreateShaderModule( const std::vector<char>& code );
     VulkanGraphicsPipeline CreateGraphicsPipeline( VkShaderModule vertex, VkShaderModule fragment );
@@ -100,9 +109,15 @@ private:
     std::vector<VkFramebuffer> CreateFramebuffers();
 
     VkCommandPool CreateCommandPool( QueueFamilyIndices indices );
-    VkCommandBuffer CreateCommandBuffer();
+    std::vector<VkCommandBuffer> CreateCommandBuffers();
 
     VulkanSyncObjects CreateSyncObjects();
+
+	VulkanBuffer CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props );
+    VulkanBuffer CreateVertexBuffer();
+    VulkanBuffer CreateIndexBuffer();
+
+    void CopyBuffer( VkBuffer source, VkBuffer destination, VkDeviceSize size );
     
 private:
     void RecordCommandBuffer( uint32 image_index );
@@ -119,8 +134,8 @@ private:
     VkQueue          GraphicsQueue;
     VkQueue          PresentQueue;
 
-    VkCommandPool CommandPool;
-    VkCommandBuffer CommandBuffer;
+    VkCommandPool   CommandPool;
+    std::vector<VkCommandBuffer> CommandBuffers;
 
     //  pipeline related 
     VulkanGraphicsPipeline GraphicsPipeline;
@@ -128,10 +143,17 @@ private:
     // swapchain related
     VulkanSwapchain Swapchain;
 
-    std::vector<VkImageView> ImageViews;
+    std::vector<VkImageView>   ImageViews;
     std::vector<VkFramebuffer> Framebuffers;
 
     VulkanSyncObjects SyncObjects;
+
+    VulkanBuffer VertexBuffer;
+    VulkanBuffer IndexBuffer;
+
+private:
+    const int32 MAX_FRAMES_IN_FLIGHT = 2;
+    uint32 CurrentFrame = 0;
 };
 
 #endif 

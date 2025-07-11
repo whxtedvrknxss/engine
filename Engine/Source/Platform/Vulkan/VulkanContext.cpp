@@ -9,6 +9,7 @@
 #include "Engine/Core/Log.h"
 #include "Engine/Core/Assert.h"
 #include "Shader.h"
+#include "VulkanMath.h"
 
 #define VK_TYPE_TO_STR(type) #type
 
@@ -26,7 +27,6 @@ VulkanContext::VulkanContext( VulkanContextCreateInfo& context_info, SDL_Window*
     Swapchain = {};
     GraphicsPipeline = {};
     CommandPool = VK_NULL_HANDLE;
-    CommandBuffer = VK_NULL_HANDLE;
     SyncObjects = {};
 }
 
@@ -113,9 +113,12 @@ void VulkanContext::Init()
     vkDestroyShaderModule( Device, fragment, nullptr );
 
     Framebuffers = CreateFramebuffers();
-    if ( Framebuffers.size() == 0 )
+    for ( int32 i = 0; i < Framebuffers.size(); ++i )
     {
-        throw std::runtime_error( "Framebuffers.size == 0" );
+        if ( Framebuffers[i] == VK_NULL_HANDLE )
+        {
+            throw std::runtime_error( "Framebuffer == VK_NULL_HANDLE" );
+        }
     }
 
     CommandPool = CreateCommandPool( indices );
@@ -124,81 +127,104 @@ void VulkanContext::Init()
         throw std::runtime_error( "CommandPool == VK_NULL_HANDLE" );
     }
 
-    CommandBuffer = CreateCommandBuffer();
-    if ( CommandBuffer == VK_NULL_HANDLE )
+    CommandBuffers = CreateCommandBuffers();
+    for ( int32 i = 0; i < CommandBuffers.size(); ++i )
     {
-        throw std::runtime_error( "CommandBuffer == VK_NULL_HANDLE" );
+        if ( CommandBuffers[i] == VK_NULL_HANDLE )
+        {
+            throw std::runtime_error( "CommandBuffer == VK_NULL_HANDLE" );
+        }
     }
 
     SyncObjects = CreateSyncObjects();
-    bool sync_objs_invalid = SyncObjects.ImageAvailableSemaphore == VK_NULL_HANDLE ||
-                             SyncObjects.InFlightFence == VK_NULL_HANDLE || 
-                             SyncObjects.RenderFinishedSemaphore == VK_NULL_HANDLE;
-    if ( sync_objs_invalid )
+    for ( int32 i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i )
     {
-        throw std::runtime_error( "sync objects are invalid" );
+        bool sync_objs_invalid = SyncObjects.ImageAvailableSemaphores[i] == VK_NULL_HANDLE ||
+                                 SyncObjects.InFlightFences[i] == VK_NULL_HANDLE ||
+                                 SyncObjects.RenderFinishedSemaphores[i] == VK_NULL_HANDLE;
+        if ( sync_objs_invalid )
+        {
+            throw std::runtime_error( "sync objects are invalid" );
+        }
+    }
+
+    VertexBuffer = CreateVertexBuffer();
+    if ( VertexBuffer.Instance == VK_NULL_HANDLE || VertexBuffer.Memory == VK_NULL_HANDLE )
+    {
+        throw std::runtime_error( "VertexBuffer == VK_NULL_HANDLE || VertexBufferMemory == VK_NULL_HANDLE" );
+    }
+
+    IndexBuffer = CreateIndexBuffer();
+    if ( IndexBuffer.Instance == VK_NULL_HANDLE || IndexBuffer.Memory == VK_NULL_HANDLE )
+    {
+        throw std::runtime_error( "IndexBuffer == VK_NULL_HANDLE || IndexBufferMemory == VK_NULL_HANDLE" );
     }
 }
 
 void VulkanContext::Cleanup()
 {
-    const VkAllocationCallbacks* ALLOCATOR = nullptr;
+    const VkAllocationCallbacks* ALLOC = nullptr;
 
-    vkDestroySemaphore( Device, SyncObjects.ImageAvailableSemaphore, ALLOCATOR );
-    vkDestroySemaphore( Device, SyncObjects.RenderFinishedSemaphore, ALLOCATOR );
-    vkDestroyFence( Device, SyncObjects.InFlightFence, ALLOCATOR );
+    CleanupSwapchain();
 
-    vkDestroyCommandPool( Device, CommandPool, ALLOCATOR );
+    vkDestroyBuffer( Device, IndexBuffer.Instance, ALLOC );
+    vkFreeMemory( Device, IndexBuffer.Memory, ALLOC );
 
-    for ( auto framebuffer : Framebuffers )
+    vkDestroyBuffer( Device, VertexBuffer.Instance, ALLOC );
+    vkFreeMemory( Device, VertexBuffer.Memory, ALLOC );
+
+    vkDestroyPipeline( Device, GraphicsPipeline.Instance, ALLOC );
+    vkDestroyPipelineLayout( Device, GraphicsPipeline.Layout, ALLOC );
+    vkDestroyRenderPass( Device, GraphicsPipeline.RenderPass, ALLOC );
+
+    for ( size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i )
     {
-        vkDestroyFramebuffer( Device, framebuffer, ALLOCATOR );
+        vkDestroySemaphore( Device, SyncObjects.ImageAvailableSemaphores[i], ALLOC );
+        vkDestroySemaphore( Device, SyncObjects.RenderFinishedSemaphores[i], ALLOC );
+        vkDestroyFence( Device, SyncObjects.InFlightFences[i], ALLOC );
     }
 
-    vkDestroyPipeline( Device, GraphicsPipeline.Instance, ALLOCATOR );
-    vkDestroyPipelineLayout( Device, GraphicsPipeline.Layout, ALLOCATOR );
-    vkDestroyRenderPass( Device, GraphicsPipeline.RenderPass, ALLOCATOR );
+    vkDestroyCommandPool( Device, CommandPool, ALLOC );
 
-    for ( auto image_view : ImageViews )
-    {
-        vkDestroyImageView( Device, image_view, ALLOCATOR );
-    }
-
-    vkDestroySwapchainKHR( Device, Swapchain.Instance, ALLOCATOR );
-    vkDestroyDevice( Device, ALLOCATOR );
-    vkDestroySurfaceKHR( Instance, Surface, ALLOCATOR );
-    vkDestroyInstance( Instance, ALLOCATOR );
+    vkDestroyDevice( Device, ALLOC );
+    vkDestroySurfaceKHR( Instance, Surface, ALLOC );
+    vkDestroyInstance( Instance, ALLOC );
 }
 
 void VulkanContext::DrawFrame()
 {
     VkResult err;
 
-    const uint32 FENCE_COUNT = 1;
+    const uint32   FENCE_COUNT = 1;
     const VkBool32 WAIT_ALL = VK_TRUE;
-    const uint64 TIMEOUT = UINT64_MAX;
-    err = vkWaitForFences( Device, FENCE_COUNT, &SyncObjects.InFlightFence, WAIT_ALL, TIMEOUT );
+    const uint64   TIMEOUT = UINT64_MAX;
+    err = vkWaitForFences( Device, FENCE_COUNT, &SyncObjects.InFlightFences[CurrentFrame], WAIT_ALL, TIMEOUT );
     if ( err != VK_SUCCESS )
     {
         LOG_ERROR( "[Vulkan] Error from vkWaitForFences: {}", err );
     }
 
-    err = vkResetFences( Device, FENCE_COUNT, &SyncObjects.InFlightFence );
+    uint32  image_index;
+    VkFence FENCE = VK_NULL_HANDLE;
+    err = vkAcquireNextImageKHR( Device, Swapchain.Instance, TIMEOUT,
+        SyncObjects.ImageAvailableSemaphores[CurrentFrame], FENCE, &image_index );
+    if ( err == VK_ERROR_OUT_OF_DATE_KHR )
+    {
+        RecreateSwapchain();
+        return;
+    }
+    else if ( err != VK_SUCCESS && err != VK_SUBOPTIMAL_KHR )
+    {
+        LOG_ERROR( "[Vulkan] Error from vkAcquireNextImageKHR: %d", err );
+    }
+
+    err = vkResetFences( Device, FENCE_COUNT, &SyncObjects.InFlightFences[CurrentFrame] );
     if ( err != VK_SUCCESS )
     {
         LOG_ERROR( "[Vulkan] Error from vkResetFences: %d", err );
     }
 
-    uint32 image_index;
-    VkFence FENCE = VK_NULL_HANDLE;
-    err = vkAcquireNextImageKHR( Device, Swapchain.Instance, TIMEOUT, SyncObjects.ImageAvailableSemaphore,
-        FENCE, &image_index );
-    if ( err != VK_SUCCESS )
-    {
-        LOG_ERROR( "[Vulkan] Error from vkAcquireNextImageKHR: %d", err );
-    }
-
-    err = vkResetCommandBuffer( CommandBuffer, 0 );
+    err = vkResetCommandBuffer( CommandBuffers[CurrentFrame], 0 );
     if ( err != VK_SUCCESS )
     {
         LOG_ERROR( "[Vulkan] Error from vkResetCommandBuffer: %d", err );
@@ -208,20 +234,20 @@ void VulkanContext::DrawFrame()
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore wait_semaphores[] = { SyncObjects.ImageAvailableSemaphore };
+    VkSemaphore wait_semaphores[] = { SyncObjects.ImageAvailableSemaphores[CurrentFrame] };
     VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submit_info.waitSemaphoreCount = 1;
     submit_info.pWaitSemaphores = wait_semaphores;
     submit_info.pWaitDstStageMask = wait_stages;
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &CommandBuffer;
+    submit_info.pCommandBuffers = &CommandBuffers[CurrentFrame];
 
-    VkSemaphore signal_semaphores[] = { SyncObjects.RenderFinishedSemaphore };
+    VkSemaphore signal_semaphores[] = { SyncObjects.RenderFinishedSemaphores[CurrentFrame] };
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
 
     const uint32 SUBMIT_COUNT = 1;
-    err = vkQueueSubmit( GraphicsQueue, SUBMIT_COUNT, &submit_info, SyncObjects.InFlightFence );
+    err = vkQueueSubmit( GraphicsQueue, SUBMIT_COUNT, &submit_info, SyncObjects.InFlightFences[CurrentFrame] );
     if ( err != VK_SUCCESS )
     {
         throw std::runtime_error( "failed to submit draw command buffer!" );
@@ -237,7 +263,17 @@ void VulkanContext::DrawFrame()
     present_info.pSwapchains = swapchains;
     present_info.pImageIndices = &image_index;
 
-    vkQueuePresentKHR( PresentQueue, &present_info );
+    err = vkQueuePresentKHR( PresentQueue, &present_info );
+    if ( err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR )
+    {
+        RecreateSwapchain();
+    }
+    else if ( err != VK_SUCCESS )
+    {
+        // LOG_ERROR
+    }
+
+    CurrentFrame = ( CurrentFrame + 1 ) % MAX_FRAMES_IN_FLIGHT;
 }
 
 bool VulkanContext::IsExtensionAvailable( const std::vector<VkExtensionProperties>& props, const char* extension )
@@ -611,6 +647,48 @@ VulkanSwapchain VulkanContext::CreateSwapchain()
     return swapchain;
 }
 
+void VulkanContext::CleanupSwapchain()
+{
+    const VkAllocationCallbacks* ALLOC = nullptr;
+
+    for ( auto framebuffer : Framebuffers )
+    {
+        vkDestroyFramebuffer( Device, framebuffer, ALLOC );
+    }
+
+    for ( auto image_view : ImageViews )
+    {
+        vkDestroyImageView( Device, image_view, ALLOC );
+    }
+
+    vkDestroySwapchainKHR( Device, Swapchain.Instance, ALLOC );
+}
+
+void VulkanContext::RecreateSwapchain()
+{
+    vkDeviceWaitIdle( Device );
+
+    CleanupSwapchain();
+
+    Swapchain = CreateSwapchain();
+    if ( Swapchain.Instance == VK_NULL_HANDLE )
+    {
+        // LOG_ERROR
+    }
+
+    ImageViews = CreateImageViews();
+    if ( ImageViews.size() == 0 )
+    {
+        // LOG_ERROR
+    }
+
+    Framebuffers = CreateFramebuffers();
+    if ( Framebuffers.size() == 0 )
+    {
+        // LOG_ERROR
+    }
+}
+
 VkShaderModule VulkanContext::CreateShaderModule( const std::vector<char>& code )
 {
     VkShaderModuleCreateInfo module_info = {};
@@ -721,9 +799,14 @@ VulkanGraphicsPipeline VulkanContext::CreateGraphicsPipeline( VkShaderModule ver
     dynamic_state_info.dynamicStateCount = static_cast< uint32 >( dynamic_states.size() );
     dynamic_state_info.pDynamicStates = dynamic_states.data();
 
+    auto binding_desc   = Vertex::GetBindingDescription();
+    auto attribute_desc = Vertex::GetAttributeDescription();
     VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
+    vertex_input_info.vertexBindingDescriptionCount = 1;
+    vertex_input_info.vertexAttributeDescriptionCount = static_cast< uint32 >( attribute_desc.size() );
+    vertex_input_info.pVertexBindingDescriptions = &binding_desc;
+    vertex_input_info.pVertexAttributeDescriptions = attribute_desc.data();
 
     VkPipelineInputAssemblyStateCreateInfo assembly_info = {};
     assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -892,83 +975,242 @@ VkCommandPool VulkanContext::CreateCommandPool( QueueFamilyIndices indices )
     return command_pool;
 }
 
-VkCommandBuffer VulkanContext::CreateCommandBuffer()
+std::vector<VkCommandBuffer> VulkanContext::CreateCommandBuffers()
 {
+    std::vector<VkCommandBuffer> command_buffers( MAX_FRAMES_IN_FLIGHT );
+
     VkCommandBufferAllocateInfo alloc_info = {};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = CommandPool;
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount = 1;
+    alloc_info.commandBufferCount = static_cast< uint32 >( command_buffers.size() );
 
-    VkCommandBuffer command_buffer;
-    VkResult err = vkAllocateCommandBuffers( Device, &alloc_info, &command_buffer );
+    VkResult err = vkAllocateCommandBuffers( Device, &alloc_info, command_buffers.data() );
     if ( err != VK_SUCCESS )
     {
         LOG_ERROR(
-            "[Vulkan] Error allocating Vulkan Command Buffer. vkAllocateCommandBuffers returned: {}={}",
+            "[Vulkan] Error allocating Vulkan Command Buffers. vkAllocateCommandBuffers returned: {}={}",
             VK_TYPE_TO_STR( VkResult ),
             err 
         );
-        return VK_NULL_HANDLE;
+        return {};
     }
-    return command_buffer;
+    return command_buffers;
 }
 
 VulkanSyncObjects VulkanContext::CreateSyncObjects()
 {
     VkResult err;
+    VulkanSyncObjects sync_objs;
+    sync_objs.ImageAvailableSemaphores.resize( MAX_FRAMES_IN_FLIGHT );
+    sync_objs.RenderFinishedSemaphores.resize( MAX_FRAMES_IN_FLIGHT );
+    sync_objs.InFlightFences.resize( MAX_FRAMES_IN_FLIGHT );
+
     VkSemaphoreCreateInfo semaphore_info = {};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    const VkAllocationCallbacks* allocator = nullptr;
-
-    VulkanSyncObjects sync_objects;
-    err = vkCreateSemaphore( Device, &semaphore_info, allocator, &sync_objects.ImageAvailableSemaphore );
-    if ( err != VK_SUCCESS )
-    {
-        // LOG_ERROR
-        return {};
-    }
-
-    err = vkCreateSemaphore( Device, &semaphore_info, allocator, &sync_objects.RenderFinishedSemaphore );
-    if ( err != VK_SUCCESS )
-    {
-        // LOG_ERROR
-        return {};
-    }
 
     VkFenceCreateInfo fence_info = {};
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    err = vkCreateFence( Device, &fence_info, allocator, &sync_objects.InFlightFence );
-    if ( err != VK_SUCCESS )
+
+    const VkAllocationCallbacks* allocator = nullptr;
+
+    for ( size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i )
+    {
+        err = vkCreateSemaphore( Device, &semaphore_info, allocator, &sync_objs.ImageAvailableSemaphores[i] );
+        if ( err != VK_SUCCESS )
+        {
+            // LOG_ERROR
+            return {};
+        }
+
+        err = vkCreateSemaphore( Device, &semaphore_info, allocator, &sync_objs.RenderFinishedSemaphores[i] );
+        if ( err != VK_SUCCESS )
+        {
+            // LOG_ERROR
+            return {};
+        }
+
+        err = vkCreateFence( Device, &fence_info, allocator, &sync_objs.InFlightFences[i] );
+        if ( err != VK_SUCCESS )
+        {
+            // LOG_ERROR
+          return {};
+        }
+    }
+    return sync_objs;
+}
+
+VulkanBuffer VulkanContext::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags props )
+{
+    VkResult err;
+    VulkanBuffer buffer;
+
+    VkBufferCreateInfo buffer_info = {};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = size;
+    buffer_info.usage = usage;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    const VkAllocationCallbacks* ALLOC = nullptr;
+    err = vkCreateBuffer( Device, &buffer_info, ALLOC, &buffer.Instance );
+    if (err != VK_SUCCESS)
     {
         // LOG_ERROR
         return {};
     }
-    return sync_objects;
+
+    VkMemoryRequirements memory_requirements = {};
+    vkGetBufferMemoryRequirements( Device, buffer.Instance, &memory_requirements );
+
+    VkMemoryAllocateInfo allocate_info = {};
+    allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocate_info.allocationSize = memory_requirements.size;
+
+    std::optional<uint32> index;
+	VkPhysicalDeviceMemoryProperties memory_props = {};
+	vkGetPhysicalDeviceMemoryProperties( PhysicalDevice, &memory_props );
+	for (uint32 i = 0; i < memory_props.memoryTypeCount; ++i)
+	{
+		if ( ( memory_requirements.memoryTypeBits & ( 1 << i ) ) &&
+			( memory_props.memoryTypes[i].propertyFlags & props ) == props )
+		{
+			index = i;
+		}
+	}
+
+	if ( index.has_value() )
+	{
+		allocate_info.memoryTypeIndex = index.value();
+	}
+
+	err = vkAllocateMemory( Device, &allocate_info, ALLOC, &buffer.Memory );
+	if ( err != VK_SUCCESS )
+	{
+		// LOG_ERROR
+		return {};
+	}
+
+	const VkDeviceSize MEMORY_OFFSET = 0;
+	vkBindBufferMemory( Device, buffer.Instance, buffer.Memory, MEMORY_OFFSET );
+
+	return buffer;
+}
+
+VulkanBuffer VulkanContext::CreateVertexBuffer()
+{
+	const VkDeviceSize    buffer_size = sizeof( VERTICES[0] ) * VERTICES.size();
+	VkBufferUsageFlags    usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	VkMemoryPropertyFlags props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	VulkanBuffer staging_buffer = CreateBuffer( buffer_size, usage, props );
+
+	const VkDeviceSize     offset = 0;
+	const VkMemoryMapFlags flags = 0;
+	void* data;
+	vkMapMemory( Device, staging_buffer.Memory, offset, buffer_size, flags, &data );
+	memcpy( data, VERTICES.data(), static_cast< size_t >( buffer_size ) );
+	vkUnmapMemory( Device, staging_buffer.Memory );
+
+    usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    props = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    VulkanBuffer vertex_buffer = CreateBuffer( buffer_size, usage, props );
+
+    CopyBuffer( staging_buffer.Instance, vertex_buffer.Instance, buffer_size );
+
+    const VkAllocationCallbacks* alloc = nullptr;
+    vkDestroyBuffer( Device, staging_buffer.Instance, alloc );
+    vkFreeMemory( Device, staging_buffer.Memory, alloc );
+
+    return vertex_buffer;
+}
+
+VulkanBuffer VulkanContext::CreateIndexBuffer()
+{
+    VkDeviceSize buffer_size = sizeof( INDICES[0] ) * INDICES.size();
+
+    VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    VkMemoryPropertyFlags props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	VulkanBuffer staging_buffer = CreateBuffer( buffer_size, usage, props );
+
+    const VkDeviceSize     offset = 0;
+    const VkMemoryMapFlags flags = 0;
+    void* data;
+    vkMapMemory( Device, staging_buffer.Memory, offset, buffer_size, flags, &data );
+    memcpy( data, INDICES.data(), static_cast< size_t >( buffer_size ) );
+    vkUnmapMemory( Device, staging_buffer.Memory );
+
+    usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    props = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    VulkanBuffer index_buffer = CreateBuffer( buffer_size, usage, props );
+
+    CopyBuffer( staging_buffer.Instance, index_buffer.Instance, buffer_size );
+
+    const VkAllocationCallbacks* alloc = nullptr;
+    vkDestroyBuffer( Device, staging_buffer.Instance, alloc );
+    vkFreeMemory( Device, staging_buffer.Memory, alloc );
+
+    return index_buffer;
+}
+
+void VulkanContext::CopyBuffer( VkBuffer source, VkBuffer destination, VkDeviceSize size )
+{
+    VkCommandBufferAllocateInfo allocate_info = {};
+    allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate_info.commandPool = CommandPool;
+    allocate_info.commandBufferCount = 1;
+
+    VkCommandBuffer command_buffer;
+    vkAllocateCommandBuffers( Device, &allocate_info, &command_buffer );
+
+    VkCommandBufferBeginInfo begin_info = {};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer( command_buffer, &begin_info );
+
+    VkBufferCopy buffer_copy = {};
+    buffer_copy.size = size;
+    const uint32 region_count = 1;
+    vkCmdCopyBuffer( command_buffer, source, destination, region_count, &buffer_copy );
+
+    vkEndCommandBuffer( command_buffer );
+
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+
+    const uint32 submit_count = 1;
+    const VkFence fence = VK_NULL_HANDLE;
+    vkQueueSubmit( GraphicsQueue, submit_count, &submit_info, fence );
+    vkQueueWaitIdle( GraphicsQueue );
+
+    const uint32 command_buffer_count = 1;
+    vkFreeCommandBuffers( Device, CommandPool, command_buffer_count, &command_buffer );
 }
 
 void VulkanContext::RecordCommandBuffer( uint32 image_index )
 {
-    VkResult err;
-    VkCommandBufferBeginInfo begin_info = {};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    
-    err = vkBeginCommandBuffer( CommandBuffer, &begin_info );
-    if ( err != VK_SUCCESS )
-    {
-        LOG_ERROR(
-            "[Vulkan] Error beginning recording Vulkan Command Buffer. vkBeginCommandBuffer returned: {}={}",
-            VK_TYPE_TO_STR( VkResult ),
-            err 
-        );
-        throw std::runtime_error( "failed to begin recording command buffer" );
-    }
+	VkResult err;
+	VkCommandBufferBeginInfo begin_info = {};
+	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-    VkRenderPassBeginInfo render_pass_info = {};
-    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render_pass_info.renderPass = GraphicsPipeline.RenderPass;
+	err = vkBeginCommandBuffer( CommandBuffers[CurrentFrame], &begin_info );
+	if ( err != VK_SUCCESS )
+	{
+		LOG_ERROR(
+			"[Vulkan] Error beginning recording Vulkan Command Buffer. vkBeginCommandBuffer returned: {}={}",
+			VK_TYPE_TO_STR( VkResult ),
+			err
+		);
+		throw std::runtime_error( "failed to begin recording command buffer" );
+	}
+
+	VkRenderPassBeginInfo render_pass_info = {};
+	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	render_pass_info.renderPass = GraphicsPipeline.RenderPass;
     render_pass_info.framebuffer = Framebuffers[image_index];
     render_pass_info.renderArea.offset = { 0,0 };
     render_pass_info.renderArea.extent = Swapchain.Extent;
@@ -977,8 +1219,18 @@ void VulkanContext::RecordCommandBuffer( uint32 image_index )
     render_pass_info.clearValueCount = 1;
     render_pass_info.pClearValues = &color;
     
-    vkCmdBeginRenderPass( CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE );
-    vkCmdBindPipeline( CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline.Instance );
+    vkCmdBeginRenderPass( CommandBuffers[CurrentFrame], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline( CommandBuffers[CurrentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline.Instance);
+
+    VkBuffer vertex_buffers[] = { VertexBuffer.Instance };
+    VkDeviceSize offsets[] = { 0 };
+
+    const uint32 FIRST_BINDING = 0;
+    const uint32 BINDING_COUNT = 1;
+	vkCmdBindVertexBuffers( CommandBuffers[CurrentFrame], FIRST_BINDING, BINDING_COUNT, vertex_buffers, offsets );
+
+    const VkDeviceSize offset = 0;
+    vkCmdBindIndexBuffer( CommandBuffers[CurrentFrame], IndexBuffer.Instance, offset, VK_INDEX_TYPE_UINT16 );
 
     VkViewport viewport = {};
     viewport.x = 0.0f;
@@ -987,22 +1239,23 @@ void VulkanContext::RecordCommandBuffer( uint32 image_index )
     viewport.height = static_cast< float >( Swapchain.Extent.height );
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    vkCmdSetViewport( CommandBuffer, 0, 1, &viewport );
+    vkCmdSetViewport( CommandBuffers[CurrentFrame], 0, 1, &viewport);
 
     VkRect2D scissor = {};
     scissor.offset = { 0,0 };
     scissor.extent = Swapchain.Extent;
-    vkCmdSetScissor( CommandBuffer, 0, 1, &scissor );
+    vkCmdSetScissor( CommandBuffers[CurrentFrame], 0, 1, &scissor);
 
-    const uint32 vertex_count = 3;
     const uint32 instance_count = 1;
-    const uint32 first_vertex = 0;
+    const uint32 first_index = 0;
+    const int32  vertex_offset = 0;
     const uint32 first_instance = 0;
-    vkCmdDraw( CommandBuffer, vertex_count, instance_count, first_vertex, first_instance );
+    vkCmdDrawIndexed( CommandBuffers[CurrentFrame], static_cast< uint32 >( INDICES.size() ), instance_count,
+        first_index, vertex_offset, first_instance );
 
-    vkCmdEndRenderPass( CommandBuffer );
+	vkCmdEndRenderPass( CommandBuffers[CurrentFrame] );
 
-    err = vkEndCommandBuffer( CommandBuffer );
+    err = vkEndCommandBuffer( CommandBuffers[CurrentFrame]);
     if ( err != VK_SUCCESS )
     {
         LOG_ERROR(

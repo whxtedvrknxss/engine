@@ -3,8 +3,8 @@ project "Engine"
     kind "StaticLib"
     cppdialect "C++20"
 
-    targetdir ("%{wks.location}/build/bin/" .. outputdir .. "/%{prj.name}")
-    objdir ("%{wks.location}/build/obj/" .. outputdir .. "/%{prj.name}")
+    targetdir ("%{wks.location}/Build/Bin/" .. outputdir .. "/%{prj.name}")
+    objdir ("%{wks.location}/Build/Obj/" .. outputdir .. "/%{prj.name}")
 
     defines 
     {
@@ -38,9 +38,8 @@ project "Engine"
 
     postbuildcommands 
     {
-        '{MKDIR} %{cfg.targetdir}/Shaders',
-        '"%{VULKAN_SDK}/Bin/glslc" "%{prj.location}/Shaders/triangle.vert" -o "%{cfg.targetdir}/Shaders/triangle.vert.spv"',
-        '"%{VULKAN_SDK}/Bin/glslc" "%{prj.location}/Shaders/triangle.frag" -o "%{cfg.targetdir}/Shaders/triangle.frag.spv"',
+        '"%{VULKAN_SDK}/Bin/glslc" "%{prj.location}/Shaders/triangle.vert" -o "%{prj.location}/Shaders/triangle.vert.spv"',
+        '"%{VULKAN_SDK}/Bin/glslc" "%{prj.location}/Shaders/triangle.frag" -o "%{prj.location}/Shaders/triangle.frag.spv"',
     }
 
     filter "system:Windows"

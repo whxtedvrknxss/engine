@@ -35,4 +35,3 @@ workspace "Engine"
     group "Dependencies"
         include "Engine/external/imgui"
         include "Engine/external/sdl"
-
