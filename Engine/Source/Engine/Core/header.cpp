@@ -617,8 +617,8 @@
 
 #include "Application.h"
 
-void show_window()
+void show_window( int argc, char* argv[] )
 {
-    Application app;
+	Application app( argc, argv );
     app.Run();
 }   

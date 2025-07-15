@@ -47,6 +47,7 @@ struct VulkanGraphicsPipeline
     VkRenderPass     RenderPass;
     VkPipelineLayout Layout;
     VkPipeline       Instance;
+    VkDescriptorSetLayout DescriptorSetLayout;
 };
 
 struct VulkanSyncObjects
@@ -60,7 +61,25 @@ struct VulkanBuffer
 {
     VkBuffer       Instance;
     VkDeviceMemory Memory;
+    void*          Mapped;
 };
+
+struct VulkanDescriptorGroup
+{
+    VkDescriptorPool             Pool;
+    std::vector<VkDescriptorSet> Sets;
+};
+
+namespace Vulkan
+{
+	struct Texture 
+	{
+        VkImage        Image;
+        VkImageView    View;
+        VkSampler      Sampler;
+        VkDeviceMemory Memory;
+	};
+} 
 
 class VulkanContext : public GraphicsContext
 {
@@ -73,6 +92,7 @@ public:
 
     void BeginFrame() override
     {
+        ( void ) 0;
     }
 
     void DrawFrame();
@@ -84,6 +104,7 @@ public:
 
     void SwapBuffers() override
     {
+        ( void ) 0;
     }
 
 private:
@@ -113,14 +134,30 @@ private:
 
     VulkanSyncObjects CreateSyncObjects();
 
+    uint32 FindMemoryType( uint32 type_filter, VkMemoryPropertyFlags prop_flags );
+
 	VulkanBuffer CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props );
     VulkanBuffer CreateVertexBuffer();
     VulkanBuffer CreateIndexBuffer();
-
+    std::vector<VulkanBuffer> CreateUniformBuffers();
     void CopyBuffer( VkBuffer source, VkBuffer destination, VkDeviceSize size );
+
+    void UpdateUniformBuffer( uint32 current_image );
+
+    VulkanDescriptorGroup CreateDescriptorGroup();
+
+    Vulkan::Texture CreateTexture();
+	Vulkan::Texture CreateTextureImage( int32 width, int32 height, VkFormat format, VkImageTiling tiling,
+		VkImageUsageFlags usage, VkMemoryPropertyFlags memory_props );
     
-private:
     void RecordCommandBuffer( uint32 image_index );
+
+    VkCommandBuffer BeginSingleTimeCommands(); 
+    void EndSingleTimeCommands( VkCommandBuffer command_buffer );
+
+    void TransitionImageLayout( const Vulkan::Texture& texture, VkFormat format, VkImageLayout old_layout,
+        VkImageLayout new_layout );
+    void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32 width, uint32 height );
 
 private:
     VulkanContextCreateInfo ContextInfo;
@@ -150,6 +187,12 @@ private:
 
     VulkanBuffer VertexBuffer;
     VulkanBuffer IndexBuffer;
+    std::vector<VulkanBuffer> UniformBuffers;
+    VulkanBuffer StagingBuffer;
+
+    VulkanDescriptorGroup DescriptorGroup;
+
+    Vulkan::Texture Texture;
 
 private:
     const int32 MAX_FRAMES_IN_FLIGHT = 2;

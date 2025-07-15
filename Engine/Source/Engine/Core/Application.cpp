@@ -5,7 +5,9 @@
 
 #include <SDL3/SDL.h>
 
-Application::Application()
+std::filesystem::path Application::ExePath;
+
+Application::Application( int argc, char* argv[] )
 {
     if ( !SDL_Init( SDL_INIT_VIDEO ) )
     {
@@ -17,6 +19,9 @@ Application::Application()
     window_info.Size = { 800, 500 };
     window_info.Title = "some title";
     Window = WindowBase::Create( window_info );
+
+	ExePath = argv[1];
+    std::printf( ExePath.string().c_str() );
 }
 
 Application::~Application()
