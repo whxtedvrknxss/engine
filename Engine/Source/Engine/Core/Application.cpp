@@ -5,10 +5,13 @@
 
 #include <SDL3/SDL.h>
 
+#include <Windows.h>
+
 std::filesystem::path Application::ExePath;
 
 Application::Application( int argc, char* argv[] )
 {
+    ExePath = argv[0];
     if ( !SDL_Init( SDL_INIT_VIDEO ) )
     {
         throw std::runtime_error( "" );
@@ -20,8 +23,6 @@ Application::Application( int argc, char* argv[] )
     window_info.Title = "some title";
     Window = WindowBase::Create( window_info );
 
-	ExePath = argv[1];
-    std::printf( ExePath.string().c_str() );
 }
 
 Application::~Application()

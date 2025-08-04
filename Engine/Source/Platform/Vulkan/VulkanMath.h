@@ -11,7 +11,7 @@
 
 struct Vertex
 {
-    glm::vec2 Pos;
+    glm::vec3 Pos;
     glm::vec3 Color;
     glm::vec2 TexCoord;
 
@@ -31,7 +31,7 @@ struct Vertex
 
         description[0].binding = 0;
         description[0].location = 0;
-        description[0].format = VK_FORMAT_R32G32_SFLOAT;
+        description[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         description[0].offset = offsetof( Vertex, Pos );
 
         description[1].binding = 0;
@@ -56,14 +56,20 @@ struct UniformBufferObject
 };
 
 const std::vector<Vertex> VERTICES = {
-    {{-0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f }},
-    {{ 0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f }},
-    {{ 0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }},
-    {{-0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f }}
+	{{ -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f }},
+    {{  0.5f, -0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f }},
+    {{  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }},
+    {{ -0.5f,  0.5f,  0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f }},
+
+    {{ -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f }},
+    {{  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f }},
+    {{  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }},
+    {{ -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f }}
 };
 
 const std::vector<uint16> INDICES = {
-	0, 1, 2, 2, 3, 0
+	0, 1, 2, 2, 3, 0,
+    4, 5, 6, 6, 7, 4
 };
 
 #endif 

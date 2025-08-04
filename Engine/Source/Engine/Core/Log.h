@@ -6,9 +6,10 @@
 
 #include <SDL3/SDL_log.h>
 
-#define LOG_INFO(...)               std::printf( std::format("[INFO] {}\n", std::format(__VA_ARGS__)).c_str() )
-#define LOG_ERROR(...)              std::printf( std::format("[ERROR] {}\n", std::format(__VA_ARGS__)).c_str() )
+#define LOG_INFO(...)       std::printf( std::format("[INFO] {}\n", std::format(__VA_ARGS__)).c_str() )
+#define LOG_ERROR(...)      std::printf( std::format("[ERROR] {}\n", std::format(__VA_ARGS__)).c_str() )
 
+#ifdef VULKAN_H_ // FIX
 #include <vulkan/vulkan.h>
 #include <string>
 
@@ -48,6 +49,6 @@ struct std::formatter<VkResult> : std::formatter<std::string>
         return std::formatter<std::string>::format( str, ctx );
     }
 };
-
+#endif
 
 #endif 
