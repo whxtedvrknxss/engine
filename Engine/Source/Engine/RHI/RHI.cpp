@@ -1,28 +1,27 @@
-#include "GraphicsContext.h"
+#include "RHI.h"
 
 #if defined ( VULKAN_SUPPORTED )
 #include <SDL3/SDL_vulkan.h>
 #endif
 
-#include "RendererAPI.h"
 #include "Engine/Core/Assert.h"
 
 #if defined( VULKAN_SUPPORTED )
-#include "Platform/Vulkan/VulkanContext.h"
+#include "Platform/Vulkan/VulkanRHI.h"
 #endif 
 
-Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend api )
+Scope<RHIContext> RHIContext::Create( void* window, RHIContext::Backend backend )
 {
-    switch ( api )
+    switch ( backend )
     {
 #if defined ( VULKAN_SUPPORTED )
-        case GraphicsBackend::Vulkan:
+        case RHIContext::Backend::Vulkan:
         {
             uint32 extensions_count = 0;
             char const* const* extensions = SDL_Vulkan_GetInstanceExtensions( &extensions_count );
 
             // TODO
-            VulkanContextCreateInfo context_info = {
+            VulkanRHI::ContextCreateInfo context_info = {
                 .ApiMajorVersion = 1,
                 .ApiMinorVersion = 2,
                 .Extensions = std::vector( extensions, extensions + extensions_count ),
@@ -31,7 +30,7 @@ Scope<GraphicsContext> GraphicsContext::Create( void* window, GraphicsBackend ap
                 .EngineName = "engine_name"
             };
 
-            return CreateScope<VulkanContext>( context_info, static_cast< SDL_Window* >( window ) );
+            return CreateScope<VulkanRHI::Context>( context_info, static_cast< SDL_Window* >( window ) );
         } break;
 #endif
 

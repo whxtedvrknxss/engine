@@ -8,7 +8,6 @@
 
 #include "Window.h"
 #include "Common.h"
-#include "Engine/Renderer/GraphicsContext.h"
 
 class Application
 {

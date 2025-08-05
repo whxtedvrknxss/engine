@@ -6,6 +6,7 @@ WindowsWindow::WindowsWindow( const WindowCreateInfo& create_info )
     Data.Position = create_info.Position;
     Data.Size = create_info.Size;
     Data.Title = create_info.Title;
+    Data.VSync = false;
 
     int32 x = Data.Size.X;
     int32 y = Data.Size.Y;
@@ -16,10 +17,9 @@ WindowsWindow::WindowsWindow( const WindowCreateInfo& create_info )
         SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE
     );
 
-    Context = GraphicsContext::Create( Window, GraphicsBackend::Vulkan );
+    Context = RHIContext::Create( Window, RHIContext::Backend::Vulkan );
     try
     {
-
         Context->Init();
     }
     catch ( const std::exception& ex )

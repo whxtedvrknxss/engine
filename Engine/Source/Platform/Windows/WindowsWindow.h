@@ -5,7 +5,7 @@
 
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Common.h"
-#include "Engine/Renderer/GraphicsContext.h"
+#include "Engine/RHI/RHI.h"
 
 class WindowsWindow : public WindowBase
 {
@@ -28,7 +28,7 @@ private:
         bool           VSync;
     } Data;
 
-    Scope<GraphicsContext> Context;
+    Scope<RHIContext> Context;
 };
 
 #endif

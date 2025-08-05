@@ -1,4 +1,4 @@
-#include "VulkanContext.h"
+#include "VulkanRHI.h"
 
 #include <set>
 #include <chrono>
@@ -23,7 +23,9 @@
 
 #define VK_TYPE_TO_STR(type) #type
 
-VulkanContext::VulkanContext( VulkanContextCreateInfo& context_info, SDL_Window* window_handle )
+namespace VulkanRHI {
+
+Context::Context( ContextCreateInfo& context_info, SDL_Window* window_handle )
 {
 	ContextInfo = std::move( context_info );
 	WindowHandle = window_handle;
@@ -46,12 +48,12 @@ VulkanContext::VulkanContext( VulkanContextCreateInfo& context_info, SDL_Window*
 	DepthTexture = {};
 }
 
-VulkanContext::~VulkanContext()
+Context::~Context()
 {
 	Cleanup();
 }
 
-void VulkanContext::Init()
+void Context::Init()
 {
 	auto instance_result = CreateInstance();
 	if ( !instance_result )
@@ -60,7 +62,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "Instance == VK_NULL_HANDLE" );
 	}
 	Instance = std::move( instance_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Instance." );
+	LOG_INFO( "[Vulkan] Successfully created Instance." );
 
 	auto surface_result = CreateSurface();
 	if ( !surface_result )
@@ -69,7 +71,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "Surface == VK_NULL_HANDLE" );
 	}
 	Surface = std::move( surface_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan surface." );
+	LOG_INFO( "[Vulkan] Successfully created surface." );
 
 	auto physical_device_result = SelectPhysicalDevice();
 	if ( !physical_device_result )
@@ -78,7 +80,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "PhysicalDevice == VK_NULL_HANDLE" );
 	}
 	PhysicalDevice = std::move( physical_device_result.value() );
-	LOG_INFO( "[Vulkan] Successfully selected Vulkan Physical Device." );
+	LOG_INFO( "[Vulkan] Successfully selected Physical Device." );
 
 	QueueFamilyIndices indices = FindQueueFamilies( PhysicalDevice, Surface );
 
@@ -89,7 +91,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "Device == VK_NULL_HANDLE" );
 	}
 	Device = std::move( device_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Device." );
+	LOG_INFO( "[Vulkan] Successfully created Device." );
 
 	GraphicsQueue = GetQueue( indices.Graphics.value(), 0 );
 	if ( GraphicsQueue == VK_NULL_HANDLE )
@@ -110,7 +112,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "Swapchain == VK_NULL_HANDLE || SwapchainImages.size == 0" );
 	}
 	Swapchain = std::move( swapchain_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Swapchain." );
+	LOG_INFO( "[Vulkan] Successfully created Swapchain." );
 
 	auto image_views_result = CreateImageViews();
 	if ( !image_views_result )
@@ -119,19 +121,19 @@ void VulkanContext::Init()
 		throw std::runtime_error( "ImageViews == null" );
 	}
 	ImageViews = std::move( image_views_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Image Views" );
+	LOG_INFO( "[Vulkan] Successfully created Image Views" );
 
 	auto shaders_path = std::filesystem::current_path().parent_path() / "Engine" / "Shaders";
 	auto vertex_shader = GetShaderSource( shaders_path / "triangle.vert.spv" );
 	auto fragment_shader = GetShaderSource( shaders_path / "triangle.frag.spv" );
 
 	VkShaderModule vertex = CreateShaderModule( vertex_shader );
-	VkShaderModule fragment = CreateShaderModule( fragment_shader );
 	if ( vertex == VK_NULL_HANDLE )
 	{
 		throw std::runtime_error( "vertex == VK_NULL_HANDLE" );
 	}
 
+	VkShaderModule fragment = CreateShaderModule( fragment_shader );
 	if ( fragment == VK_NULL_HANDLE )
 	{
 		throw std::runtime_error( "fragment == VK_NULL_HANDLE" );
@@ -144,7 +146,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "GraphicsPipeline == VK_NULL_HANDLE" );
 	}
 	GraphicsPipeline = std::move( graphics_pipeline_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Graphics Pipeline." );
+	LOG_INFO( "[Vulkan] Successfully created Graphics Pipeline." );
 
 	vkDestroyShaderModule( Device, vertex, nullptr );
 	vkDestroyShaderModule( Device, fragment, nullptr );
@@ -165,7 +167,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "CommandPool == VK_NULL_HANDLE" );
 	}
 	CommandPool = std::move( command_pool_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Command Pool." );
+	LOG_INFO( "[Vulkan] Successfully created Command Pool." );
 
 	CommandBuffers = CreateCommandBuffers();
 	for ( int32 i = 0; i < CommandBuffers.size(); ++i )
@@ -183,13 +185,16 @@ void VulkanContext::Init()
 		throw std::runtime_error( "synchronization objects are invalid" );
 	}
 	SyncObjects = std::move( sync_objects_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Synchronization objects." );
+	LOG_INFO( "[Vulkan] Successfully created Synchronization objects." );
 
-	Texture = CreateTexture();
-	if ( Texture.Image == VK_NULL_HANDLE || Texture.Memory == VK_NULL_HANDLE )
+	auto texture_result = CreateTexture();
+	if ( !texture_result )
 	{
+		LOG_ERROR( "{}", texture_result.error() );
 		throw std::runtime_error( "texture image == VK_NULL_HANDLE" );
 	}
+	Texture = std::move( texture_result.value() );
+	LOG_INFO( "[Vulkan] Successfully created Texture" );
 
 	auto vertex_buffer_result = CreateVertexBuffer();
 	if ( !vertex_buffer_result )
@@ -198,7 +203,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "VertexBuffer == VK_NULL_HANDLE || VertexBufferMemory == VK_NULL_HANDLE" );
 	}
 	VertexBuffer = std::move( vertex_buffer_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Vertex Buffer." );
+	LOG_INFO( "[Vulkan] Successfully created Vertex Buffer." );
 
 	auto index_buffer_result = CreateIndexBuffer();
 	if ( !index_buffer_result )
@@ -207,7 +212,7 @@ void VulkanContext::Init()
 		throw std::runtime_error( "IndexBuffer == VK_NULL_HANDLE || IndexBufferMemory == VK_NULL_HANDLE" );
 	}
 	IndexBuffer = std::move( index_buffer_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Index Buffer." );
+	LOG_INFO( "[Vulkan] Successfully created Index Buffer." );
 
 	auto uniform_buffers_result = CreateUniformBuffers();
 	if ( !uniform_buffers_result )
@@ -216,16 +221,19 @@ void VulkanContext::Init()
 		throw std::runtime_error( "UniformBuffers == VK_NULL_HANDLE" );
 	}
 	UniformBuffers = std::move( uniform_buffers_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Uniform Buffers." );
+	LOG_INFO( "[Vulkan] Successfully created Uniform Buffers." );
 
-	DescriptorGroup = CreateDescriptorGroup();
-	if ( DescriptorGroup.Pool == VK_NULL_HANDLE )
+	auto descriptor_group_result = CreateDescriptorGroup();
+	if ( !descriptor_group_result )
 	{
+		LOG_ERROR( "{}", descriptor_group_result.error() );
 		throw std::runtime_error( "DescriptorPool == VK_NULL_HANDLE" );
 	}
+	DescriptorGroup = std::move( descriptor_group_result.value() );
+	LOG_INFO( "[Vulkan] Successfully create Descriptor group" );
 }
 
-void VulkanContext::Cleanup()
+void Context::Cleanup()
 {
 	const VkAllocationCallbacks* alloc = nullptr;
 
@@ -261,7 +269,7 @@ void VulkanContext::Cleanup()
 	vkDestroyInstance( Instance, alloc );
 }
 
-void VulkanContext::DrawFrame()
+void Context::DrawFrame()
 {
 	VkResult err;
 
@@ -320,7 +328,8 @@ void VulkanContext::DrawFrame()
 	submit_info.pSignalSemaphores = signal_semaphores;
 
 	const uint32 SUBMIT_COUNT = 1;
-	err = vkQueueSubmit( GraphicsQueue, SUBMIT_COUNT, &submit_info, SyncObjects[CurrentFrame].InFlightFences );
+	err = vkQueueSubmit( GraphicsQueue, SUBMIT_COUNT, &submit_info, 
+		SyncObjects[CurrentFrame].InFlightFences );
 	if ( err != VK_SUCCESS )
 	{
 		throw std::runtime_error( "failed to submit draw command buffer!" );
@@ -349,7 +358,7 @@ void VulkanContext::DrawFrame()
 	CurrentFrame = ( CurrentFrame + 1 ) % MAX_FRAMES_IN_FLIGHT;
 }
 
-bool VulkanContext::IsExtensionAvailable( const std::vector<VkExtensionProperties>& props,
+bool Context::IsExtensionAvailable( const std::vector<VkExtensionProperties>& props,
 	const char* extension )
 {
 	for ( const auto& prop : props )
@@ -362,7 +371,7 @@ bool VulkanContext::IsExtensionAvailable( const std::vector<VkExtensionPropertie
 	return false;
 }
 
-bool VulkanContext::IsLayerAvailable( const std::vector<VkLayerProperties>& props, const char* layer )
+bool Context::IsLayerAvailable( const std::vector<VkLayerProperties>& props, const char* layer )
 {
 	for ( const auto& prop : props )
 	{
@@ -374,7 +383,7 @@ bool VulkanContext::IsLayerAvailable( const std::vector<VkLayerProperties>& prop
 	return false;
 }
 
-VulkanExpected<VkInstance> VulkanContext::CreateInstance()
+Expected<VkInstance> Context::CreateInstance()
 {
 	VkResult err;
 
@@ -404,7 +413,8 @@ VulkanExpected<VkInstance> VulkanContext::CreateInstance()
 	}
 
 	std::vector<VkExtensionProperties> available_extensions( count_extensions );
-	err = vkEnumerateInstanceExtensionProperties( nullptr, &count_extensions, available_extensions.data() );
+	err = vkEnumerateInstanceExtensionProperties( nullptr, &count_extensions, 
+		available_extensions.data() );
 	if ( err != VK_SUCCESS )
 	{
 		std::string message = std::format(
@@ -481,7 +491,7 @@ VulkanExpected<VkInstance> VulkanContext::CreateInstance()
 	return instance;
 }
 
-VulkanExpected<VkSurfaceKHR> VulkanContext::CreateSurface()
+Expected<VkSurfaceKHR> Context::CreateSurface()
 {
 	VkSurfaceKHR surface;
 	if ( !SDL_Vulkan_CreateSurface( WindowHandle, Instance, nullptr, &surface ) )
@@ -495,7 +505,7 @@ VulkanExpected<VkSurfaceKHR> VulkanContext::CreateSurface()
 	return surface;
 }
 
-VulkanExpected<VkPhysicalDevice> VulkanContext::SelectPhysicalDevice()
+Expected<VkPhysicalDevice> Context::SelectPhysicalDevice()
 {
 	VkResult err;
 
@@ -560,7 +570,7 @@ VulkanExpected<VkPhysicalDevice> VulkanContext::SelectPhysicalDevice()
 	return devices[0];
 }
 
-QueueFamilyIndices VulkanContext::FindQueueFamilies( VkPhysicalDevice device, VkSurfaceKHR surface )
+QueueFamilyIndices Context::FindQueueFamilies( VkPhysicalDevice device, VkSurfaceKHR surface )
 {
 	uint32 count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties( device, &count, nullptr );
@@ -594,7 +604,7 @@ QueueFamilyIndices VulkanContext::FindQueueFamilies( VkPhysicalDevice device, Vk
 	return indices;
 }
 
-VulkanExpected<VkDevice> VulkanContext::CreateDevice( QueueFamilyIndices indices )
+Expected<VkDevice> Context::CreateDevice( QueueFamilyIndices indices )
 {
 	std::set<uint32> unique_families = {
 		indices.Graphics.value(),
@@ -645,14 +655,14 @@ VulkanExpected<VkDevice> VulkanContext::CreateDevice( QueueFamilyIndices indices
 	return device;
 }
 
-VkQueue VulkanContext::GetQueue( uint32 family_index, uint32 index )
+VkQueue Context::GetQueue( uint32 family_index, uint32 index )
 {
 	VkQueue queue;
 	vkGetDeviceQueue( Device, family_index, index, &queue );
 	return queue;
 }
 
-VulkanExpected<VulkanSwapchain> VulkanContext::CreateSwapchain()
+Expected<VulkanSwapchain> Context::CreateSwapchain()
 {
 	VkResult err;
 	VkSwapchainCreateInfoKHR swapchain_info = {};
@@ -711,7 +721,7 @@ VulkanExpected<VulkanSwapchain> VulkanContext::CreateSwapchain()
 	return swapchain;
 }
 
-void VulkanContext::CleanupSwapchain()
+void Context::CleanupSwapchain()
 {
 	const VkAllocationCallbacks* alloc = nullptr;
 
@@ -728,7 +738,7 @@ void VulkanContext::CleanupSwapchain()
 	vkDestroySwapchainKHR( Device, Swapchain.Instance, alloc );
 }
 
-void VulkanContext::RecreateSwapchain()
+void Context::RecreateSwapchain()
 {
 	vkDeviceWaitIdle( Device );
 
@@ -747,15 +757,17 @@ void VulkanContext::RecreateSwapchain()
 	{
 		LOG_ERROR( "{}", image_views_result.error() );
 	}
+	ImageViews = std::move( image_views_result.value() );
 
 	auto framebuffers_result = CreateFramebuffers();
 	if ( !framebuffers_result )
 	{
 		LOG_ERROR( "{}", framebuffers_result.error() );
 	}
+	Framebuffers = std::move( framebuffers_result.value() );
 }
 
-VkShaderModule VulkanContext::CreateShaderModule( const std::vector<char>& code )
+VkShaderModule Context::CreateShaderModule( const std::vector<char>& code )
 {
 	VkShaderModuleCreateInfo module_info = {};
 	module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -776,7 +788,7 @@ VkShaderModule VulkanContext::CreateShaderModule( const std::vector<char>& code 
 	return shader_module;
 }
 
-VulkanExpected<VulkanGraphicsPipeline> VulkanContext::CreateGraphicsPipeline( VkShaderModule vertex,
+Expected<VulkanGraphicsPipeline> Context::CreateGraphicsPipeline( VkShaderModule vertex,
 	VkShaderModule fragment )
 {
 	VkResult err;
@@ -978,7 +990,7 @@ VulkanExpected<VulkanGraphicsPipeline> VulkanContext::CreateGraphicsPipeline( Vk
 }
 
 
-VulkanExpected<std::vector<VkImageView>> VulkanContext::CreateImageViews()
+Expected<std::vector<VkImageView>> Context::CreateImageViews()
 {
 	std::vector<VkImageView> image_views( Swapchain.Images.size() );
 
@@ -1018,7 +1030,7 @@ VulkanExpected<std::vector<VkImageView>> VulkanContext::CreateImageViews()
 	return image_views;
 }
 
-VulkanExpected<std::vector<VkFramebuffer>> VulkanContext::CreateFramebuffers()
+Expected<std::vector<VkFramebuffer>> Context::CreateFramebuffers()
 {
 	std::vector<VkFramebuffer> framebuffers( ImageViews.size() );
 	for ( size_t i = 0; i < ImageViews.size(); i++ )
@@ -1049,7 +1061,7 @@ VulkanExpected<std::vector<VkFramebuffer>> VulkanContext::CreateFramebuffers()
 	return framebuffers;
 }
 
-VulkanExpected<VkCommandPool> VulkanContext::CreateCommandPool( QueueFamilyIndices indices )
+Expected<VkCommandPool> Context::CreateCommandPool( QueueFamilyIndices indices )
 {
 	VkCommandPoolCreateInfo cmdpool_info = {};
 	cmdpool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -1069,7 +1081,7 @@ VulkanExpected<VkCommandPool> VulkanContext::CreateCommandPool( QueueFamilyIndic
 	return command_pool;
 }
 
-std::vector<VkCommandBuffer> VulkanContext::CreateCommandBuffers()
+std::vector<VkCommandBuffer> Context::CreateCommandBuffers()
 {
 	std::vector<VkCommandBuffer> command_buffers( MAX_FRAMES_IN_FLIGHT );
 
@@ -1092,7 +1104,7 @@ std::vector<VkCommandBuffer> VulkanContext::CreateCommandBuffers()
 	return command_buffers;
 }
 
-VulkanExpected<std::vector<VulkanSyncObjects>> VulkanContext::CreateSyncObjects()
+Expected<std::vector<VulkanSyncObjects>> Context::CreateSyncObjects()
 {
 	VkResult err;
 	std::vector<VulkanSyncObjects> sync_objs( MAX_FRAMES_IN_FLIGHT );
@@ -1142,7 +1154,7 @@ VulkanExpected<std::vector<VulkanSyncObjects>> VulkanContext::CreateSyncObjects(
 	return sync_objs;
 }
 
-uint32 VulkanContext::FindMemoryType( uint32 type_filter, VkMemoryPropertyFlags prop_flags )
+uint32 Context::FindMemoryType( uint32 type_filter, VkMemoryPropertyFlags prop_flags )
 {
 	VkPhysicalDeviceMemoryProperties memory_props = {};
 	vkGetPhysicalDeviceMemoryProperties( PhysicalDevice, &memory_props );
@@ -1159,7 +1171,7 @@ uint32 VulkanContext::FindMemoryType( uint32 type_filter, VkMemoryPropertyFlags 
 	throw std::runtime_error( "failed to find suitable memory type" );
 }
 
-VulkanExpected<VulkanBuffer> VulkanContext::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage,
+Expected<VulkanBuffer> Context::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage,
 	VkMemoryPropertyFlags props )
 {
 	VkResult err;
@@ -1214,7 +1226,7 @@ VulkanExpected<VulkanBuffer> VulkanContext::CreateBuffer( VkDeviceSize size, VkB
 	return buffer;
 }
 
-VulkanExpected<VulkanBuffer> VulkanContext::CreateVertexBuffer()
+Expected<VulkanBuffer> Context::CreateVertexBuffer()
 {
 	const VkDeviceSize    buffer_size = sizeof( VERTICES[0] ) * VERTICES.size();
 	VkBufferUsageFlags    usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -1260,7 +1272,7 @@ VulkanExpected<VulkanBuffer> VulkanContext::CreateVertexBuffer()
 	return vertex_buffer;
 }
 
-VulkanExpected<VulkanBuffer> VulkanContext::CreateIndexBuffer()
+Expected<VulkanBuffer> Context::CreateIndexBuffer()
 {
 	VkDeviceSize buffer_size = sizeof( INDICES[0] ) * INDICES.size();
 
@@ -1307,7 +1319,7 @@ VulkanExpected<VulkanBuffer> VulkanContext::CreateIndexBuffer()
 	return index_buffer;
 }
 
-VulkanExpected<std::vector<VulkanBuffer>> VulkanContext::CreateUniformBuffers()
+Expected<std::vector<VulkanBuffer>> Context::CreateUniformBuffers()
 {
 	std::vector<VulkanBuffer> uniform_buffers( MAX_FRAMES_IN_FLIGHT );
 
@@ -1341,19 +1353,25 @@ VulkanExpected<std::vector<VulkanBuffer>> VulkanContext::CreateUniformBuffers()
 	return uniform_buffers;
 }
 
-void VulkanContext::CopyBuffer( VkBuffer source, VkBuffer destination, VkDeviceSize size )
+void Context::CopyBuffer( VkBuffer source, VkBuffer destination, VkDeviceSize size )
 {
-	VkCommandBuffer command_buffer = BeginSingleTimeCommands();
+	auto command_buffer_result = BeginSingleTimeCommands();
+	if ( !command_buffer_result )
+	{
+		
+	}
+	VkCommandBuffer command_buffer = std::move( command_buffer_result.value() );
 
 	VkBufferCopy buffer_copy = {};
 	buffer_copy.size = size;
+	
 	const uint32 region_count = 1;
 	vkCmdCopyBuffer( command_buffer, source, destination, region_count, &buffer_copy );
 
 	EndSingleTimeCommands( command_buffer );
 }
 
-void VulkanContext::UpdateUniformBuffer( uint32 current_image )
+void Context::UpdateUniformBuffer( uint32 current_image )
 {
 	namespace chrono = std::chrono;
 	static auto start_time = chrono::high_resolution_clock::now();
@@ -1365,58 +1383,69 @@ void VulkanContext::UpdateUniformBuffer( uint32 current_image )
 	ubo.Model = glm::rotate(
 		glm::mat4( 1.0f ),
 		time * glm::radians( 90.0f ),
-		glm::vec3( 0.0f, 0.0f, 1.0f )
-	);
+		glm::vec3( 0.0f, 0.0f, 1.0f ) );
+
 	ubo.View = glm::lookAt(
-		glm::vec3( 1.0f ),
+		glm::vec3( 2.0f ),
 		glm::vec3( 0.0f ),
-		glm::vec3( 0.0f, 0.0f, 1.0f )
-	);
-	ubo.Projection = glm::perspective( glm::radians( 45.0f ),
-		Swapchain.Extent.width / static_cast< float >( Swapchain.Extent.height ), 0.1f, 10.0f );
+		glm::vec3( 0.0f, 0.0f, 1.0f ) );
+
+	ubo.Projection = glm::perspective( 
+		glm::radians( 45.0f ),
+		Swapchain.Extent.width / static_cast<float>( Swapchain.Extent.height ), 
+		0.1f, 
+		10.0f );
+
 	ubo.Projection[1][1] *= -1;
 
 	memcpy( UniformBuffers[current_image].Mapped, &ubo, sizeof( ubo ) );
 }
 
-VulkanDescriptorGroup VulkanContext::CreateDescriptorGroup()
+Expected<VulkanDescriptorGroup> Context::CreateDescriptorGroup()
 {
 	VkResult err;
 	VulkanDescriptorGroup descriptor_group = {};
 
 	std::array<VkDescriptorPoolSize, 2> pool_sizes = {};
 	pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	pool_sizes[0].descriptorCount = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
+	pool_sizes[0].descriptorCount = static_cast<uint32>( MAX_FRAMES_IN_FLIGHT );
 	pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	pool_sizes[1].descriptorCount = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
+	pool_sizes[1].descriptorCount = static_cast<uint32>( MAX_FRAMES_IN_FLIGHT );
 
 	VkDescriptorPoolCreateInfo pool_info = {};
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.poolSizeCount = 2;
 	pool_info.pPoolSizes = pool_sizes.data();
-	pool_info.maxSets = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
+	pool_info.maxSets = static_cast<uint32>( MAX_FRAMES_IN_FLIGHT );
 
 	const VkAllocationCallbacks* alloc = nullptr;
 	err = vkCreateDescriptorPool( Device, &pool_info, alloc, &descriptor_group.Pool );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
-		return { .Pool = VK_NULL_HANDLE };
+		std::string message = std::format(
+			"[Vulkan] Failed to create Descriptor Pool. vkCreateDescriptorPool returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
 	}
 
-	std::vector<VkDescriptorSetLayout> layouts( MAX_FRAMES_IN_FLIGHT, GraphicsPipeline.DescriptorSetLayout );
+	std::vector<VkDescriptorSetLayout> layouts( MAX_FRAMES_IN_FLIGHT, 
+		GraphicsPipeline.DescriptorSetLayout );
 	VkDescriptorSetAllocateInfo allocate_info = {};
 	allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocate_info.descriptorPool = descriptor_group.Pool;
-	allocate_info.descriptorSetCount = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
+	allocate_info.descriptorSetCount = static_cast<uint32>( MAX_FRAMES_IN_FLIGHT );
 	allocate_info.pSetLayouts = layouts.data();
 
 	descriptor_group.Sets.resize( MAX_FRAMES_IN_FLIGHT );
 	err = vkAllocateDescriptorSets( Device, &allocate_info, descriptor_group.Sets.data() );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
-		return { .Pool = VK_NULL_HANDLE };
+		std::string message = std::format(
+			"[Vulkan] Failed to allocate Descriptor Sets. vkAllocateDescriptorSets returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
 	}
 
 	for ( size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i )
@@ -1448,17 +1477,16 @@ VulkanDescriptorGroup VulkanContext::CreateDescriptorGroup()
 		descriptor_writes[1].descriptorCount = 1;
 		descriptor_writes[1].pImageInfo = &image_info;
 
-		const uint32 descriptor_write_count = static_cast< uint32 >( descriptor_writes.size() );
+		const uint32 descriptor_write_count = static_cast<uint32>( descriptor_writes.size() );
 		const uint32 descriptor_copy_count = 0;
 		const VkCopyDescriptorSet* descriptor_copies = nullptr;
 		vkUpdateDescriptorSets( Device, descriptor_write_count, descriptor_writes.data(),
 			descriptor_copy_count, descriptor_copies );
 	}
-
 	return descriptor_group;
 }
 
-VulkanRHI::Texture VulkanContext::CreateTexture()
+Expected<VulkanTexture> Context::CreateTexture()
 {
 	VkResult err;
 
@@ -1472,18 +1500,19 @@ VulkanRHI::Texture VulkanContext::CreateTexture()
 	stbi_uc* pixels = stbi_load( assets_path_string.c_str(), &width, &height, &channels, STBI_rgb_alpha );
 	if ( !pixels )
 	{
-		LOG_ERROR( "Error loading {}", assets_path_string );
-		return { VK_NULL_HANDLE };
+		std::string message = std::format( "[Vulkan] Failed to load {}", assets_path_string );
+		return std::unexpected( message );
 	}
 
 	VkDeviceSize image_size = width * height * 4;
 
 	VkBufferUsageFlags    flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	VkMemoryPropertyFlags props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	VkMemoryPropertyFlags props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+								  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	auto staging_buffer_result = CreateBuffer( image_size, flags, props );
 	if ( !staging_buffer_result )
 	{
-		//
+		return std::unexpected( staging_buffer_result.error() );
 	}
 	VulkanBuffer staging_buffer = staging_buffer_result.value();
 
@@ -1493,7 +1522,11 @@ VulkanRHI::Texture VulkanContext::CreateTexture()
 	err = vkMapMemory( Device, staging_buffer.Memory, offset, image_size, memory_flags, &data );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
+		std::string message = std::format(
+			"[Vulkan] Failed to map memory. vkMapMemory returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
 	}
 
 	memcpy( data, pixels, static_cast<size_t>( image_size ) );
@@ -1503,8 +1536,13 @@ VulkanRHI::Texture VulkanContext::CreateTexture()
 
 	flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	props = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	VulkanRHI::Texture texture = CreateTextureImage( width, height, VK_FORMAT_R8G8B8A8_SRGB,
+	auto texture_image_result = CreateTextureImage( width, height, VK_FORMAT_R8G8B8A8_SRGB,
 		VK_IMAGE_TILING_OPTIMAL, flags, props );
+	if ( !texture_image_result )
+	{
+		return std::unexpected( texture_image_result.error() );
+	}
+	VulkanTexture texture = std::move( texture_image_result.value() );
 
 	VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	VkImageLayout new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -1512,9 +1550,8 @@ VulkanRHI::Texture VulkanContext::CreateTexture()
 	CopyBufferToImage(
 		staging_buffer.Instance,
 		texture.Image,
-		static_cast< uint32 >( width ),
-		static_cast< uint32 >( height )
-	);
+		static_cast<uint32>( width ),
+		static_cast<uint32>( height ) );
 
 	old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1542,7 +1579,11 @@ VulkanRHI::Texture VulkanContext::CreateTexture()
 	err = vkCreateImageView( Device, &view_info, alloc, &texture.View );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
+		std::string message = std::format(
+			"[Vulkan] Failed to create Vulkan texture image view. vkCreateImageView returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
 	}
 
 	VkSamplerCreateInfo sampler_info = {};
@@ -1570,17 +1611,20 @@ VulkanRHI::Texture VulkanContext::CreateTexture()
 	err = vkCreateSampler( Device, &sampler_info, alloc, &texture.Sampler );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
+		std::string message = std::format(
+			"[Vulkan] Failed to create Vulkan texture sampler. vkCreateSampler returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
 	}
-
 	return texture;
 }
 
-VulkanRHI::Texture VulkanContext::CreateTextureImage( int32 width, int32 height, VkFormat format,
-	VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memory_props )
+Expected<VulkanTexture> Context::CreateTextureImage( int32 width, int32 height,
+	VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memory_props )
 {
 	VkResult err;
-	VulkanRHI::Texture texture;
+	VulkanTexture texture;
 	VkImageCreateInfo image_info = {};
 	image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1600,7 +1644,11 @@ VulkanRHI::Texture VulkanContext::CreateTextureImage( int32 width, int32 height,
 	err = vkCreateImage( Device, &image_info, alloc, &texture.Image );
 	if ( err != VK_SUCCESS )
 	{
-		return { VK_NULL_HANDLE };
+		std::string message = std::format(
+			"[Vulkan] Failed to create Vulkan texture image. vkCreateImage returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
 	}
 
 	VkMemoryRequirements memory_requirements = {};
@@ -1614,17 +1662,27 @@ VulkanRHI::Texture VulkanContext::CreateTextureImage( int32 width, int32 height,
 	err = vkAllocateMemory( Device, &allocate_info, alloc, &texture.Memory );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
-		return { VK_NULL_HANDLE };
+		std::string message = std::format(
+			"[Vulkan] Failed to allocate memory for Vulkan texture. vkAllocateMemory returned {}={}.",
+			VK_TYPE_TO_STR(VkResult),
+			err );
+		return std::unexpected( message );
 	}
 
 	const VkDeviceSize memory_offset = 0;
-	vkBindImageMemory( Device, texture.Image, texture.Memory, memory_offset );
-
+	err = vkBindImageMemory( Device, texture.Image, texture.Memory, memory_offset );
+	if ( err != VK_SUCCESS )
+	{
+		std::string message = std::format(
+			"[Vulkan] Failed to bind Vulkan texture memory. vkBindImageMemory returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
+	}
 	return texture;
 }
 
-void VulkanContext::RecordCommandBuffer( uint32 image_index )
+void Context::RecordCommandBuffer( uint32 image_index )
 {
 	VkResult err;
 	VkCommandBufferBeginInfo begin_info = {};
@@ -1634,10 +1692,10 @@ void VulkanContext::RecordCommandBuffer( uint32 image_index )
 	if ( err != VK_SUCCESS )
 	{
 		LOG_ERROR(
-			"[Vulkan] Error beginning recording Vulkan Command Buffer. vkBeginCommandBuffer returned: {}={}",
+			"[Vulkan] Error beginning recording Vulkan Command Buffer. "
+			"vkBeginCommandBuffer returned : {} = {}",
 			VK_TYPE_TO_STR( VkResult ),
-			err
-		);
+			err );
 		throw std::runtime_error( "failed to begin recording command buffer" );
 	}
 
@@ -1717,13 +1775,12 @@ void VulkanContext::RecordCommandBuffer( uint32 image_index )
 		LOG_ERROR(
 			"[Vulkan] Error ending recording Vulkan Command Buffer. vkEndCommandBuffer returned: {}={}",
 			VK_TYPE_TO_STR( VkResult ),
-			err
-		);
+			err );
 		throw std::runtime_error( "failed to end recording command buffer" );
 	}
 }
 
-VkCommandBuffer VulkanContext::BeginSingleTimeCommands()
+Expected<VkCommandBuffer> Context::BeginSingleTimeCommands()
 {
 	VkResult err;
 	VkCommandBufferAllocateInfo allocate_info = {};
@@ -1736,7 +1793,11 @@ VkCommandBuffer VulkanContext::BeginSingleTimeCommands()
 	err = vkAllocateCommandBuffers( Device, &allocate_info, &command_buffer );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
+		std::string message = std::format(
+			"[Vulkan] Failed to allocate command buffers. vkAllocateCommandBuffers returned {}={}.",
+			VK_TYPE_TO_STR(VkResult),
+			err );
+		return std::unexpected( message );
 	}
 
 	VkCommandBufferBeginInfo begin_info = {};
@@ -1746,15 +1807,27 @@ VkCommandBuffer VulkanContext::BeginSingleTimeCommands()
 	err = vkBeginCommandBuffer( command_buffer, &begin_info );
 	if ( err != VK_SUCCESS )
 	{
-		// LOG_ERROR
+		std::string message = std::format(
+			"[Vulkan] Failed to begin command buffer. vkBeginCommandBuffer returned {}={}.",
+			VK_TYPE_TO_STR(VkResult),
+			err );
+		return std::unexpected( message );
 	}
-
 	return command_buffer;
 }
 
-void VulkanContext::EndSingleTimeCommands( VkCommandBuffer command_buffer )
+void Context::EndSingleTimeCommands( VkCommandBuffer command_buffer )
 {
-	vkEndCommandBuffer( command_buffer );
+	VkResult err;
+	err = vkEndCommandBuffer( command_buffer );
+	if ( err != VK_SUCCESS )
+	{
+		LOG_ERROR(
+			"[Vulkan] Failed to end command buffer. vkEndCommandBuffer returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		throw std::runtime_error( "vkEndCommandBuffer failed" );
+	}
 
 	VkSubmitInfo submit_info = {};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1762,17 +1835,39 @@ void VulkanContext::EndSingleTimeCommands( VkCommandBuffer command_buffer )
 	submit_info.pCommandBuffers = &command_buffer;
 
 	const VkFence fence = VK_NULL_HANDLE;
-	vkQueueSubmit( GraphicsQueue, 1, &submit_info, fence );
-	vkQueueWaitIdle( GraphicsQueue );
+	err = vkQueueSubmit( GraphicsQueue, 1, &submit_info, fence );
+	if ( err != VK_SUCCESS )
+	{
+		LOG_ERROR( 
+			"[Vulkan] Failed to submit queue. vkQueueSubmit returned {}={}.",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		throw std::runtime_error( "vkQueueSubmit failed" );
+	}
+
+	err = vkQueueWaitIdle( GraphicsQueue );
+	if ( err != VK_SUCCESS )
+	{
+		LOG_ERROR(
+			"[Vulkan] Failed to wait for queue idle. vkQueueWaitIdle returned {}={}.",
+			VK_TYPE_TO_STR(VkResult),
+			err );
+	}
 
 	const uint32 command_buffer_count = 1;
 	vkFreeCommandBuffers( Device, CommandPool, command_buffer_count, &command_buffer );
 }
 
-void VulkanContext::TransitionImageLayout( const VulkanRHI::Texture& texture, VkFormat format,
+void Context::TransitionImageLayout( const VulkanTexture& texture, VkFormat format,
 	VkImageLayout old_layout, VkImageLayout new_layout )
 {
-	VkCommandBuffer command_buffer = BeginSingleTimeCommands();
+	auto command_buffer_result = BeginSingleTimeCommands();
+	if ( !command_buffer_result )
+	{
+		LOG_ERROR( "{}", command_buffer_result.error());
+		throw std::runtime_error( "BeginSingleTimeCommands failed" );
+	}
+	VkCommandBuffer command_buffer = std::move( command_buffer_result.value() );
 
 	VkImageMemoryBarrier barrier = {};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1795,8 +1890,7 @@ void VulkanContext::TransitionImageLayout( const VulkanRHI::Texture& texture, Vk
 
 	VkPipelineStageFlags source_stage;
 	VkPipelineStageFlags destination_stage;
-	if ( old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
-		new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL )
+	if ( old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL )
 	{
 		barrier.srcAccessMask = 0;
 		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1825,9 +1919,15 @@ void VulkanContext::TransitionImageLayout( const VulkanRHI::Texture& texture, Vk
 	EndSingleTimeCommands( command_buffer );
 }
 
-void VulkanContext::CopyBufferToImage( VkBuffer buffer, VkImage image, uint32 width, uint32 height )
+void Context::CopyBufferToImage( VkBuffer buffer, VkImage image, uint32 width, uint32 height )
 {
-	VkCommandBuffer command_buffer = BeginSingleTimeCommands();
+	auto command_buffer_result = BeginSingleTimeCommands();
+	if ( !command_buffer_result )
+	{
+		LOG_ERROR( "{}", command_buffer_result.error() );
+		throw std::runtime_error( "BeginSingleTimeCommands failed" );
+	}
+	VkCommandBuffer command_buffer = std::move( command_buffer_result.value() );
 
 	VkBufferImageCopy region = {};
 	region.bufferOffset = 0;
@@ -1859,4 +1959,39 @@ void VulkanContext::CopyBufferToImage( VkBuffer buffer, VkImage image, uint32 wi
 
 	EndSingleTimeCommands( command_buffer );
 }
+
+Expected<VkFormat> Context::FindSupportedFormat( std::span<const VkFormat> candidates, 
+	VkImageTiling tiling, VkFormatFeatureFlags features )
+{
+	for ( VkFormat format : candidates )
+	{
+		VkFormatProperties props;
+		vkGetPhysicalDeviceFormatProperties( PhysicalDevice, format, &props );
+
+		if ( tiling == VK_IMAGE_TILING_LINEAR && ( props.linearTilingFeatures & features ) == features )
+		{
+			return format;
+		}
+		else if ( tiling == VK_IMAGE_TILING_OPTIMAL && 
+				  ( props.optimalTilingFeatures & features ) == features )
+		{
+			return format;
+		}
+	}
+
+	return std::unexpected( "[Vulkan] Failed to find supported format." );
+}
+
+Expected<VkFormat> Context::FindDepthFormat()
+{
+	std::vector formats = {
+		VK_FORMAT_D32_SFLOAT,
+		VK_FORMAT_D32_SFLOAT_S8_UINT,
+		VK_FORMAT_D24_UNORM_S8_UINT 
+	};
+	return FindSupportedFormat( formats, VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT );
+}
+
+} // namespace Context
 

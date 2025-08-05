@@ -3,13 +3,19 @@
 #ifndef __renderer_graphics_context_h_included__
 #define __renderer_graphics_context_h_included__
 
-#include "RendererAPI.h"
 #include "Engine/Core/Common.h"
 
-class GraphicsContext
+class RHIContext
 {
 public:
-	virtual ~GraphicsContext() = default;
+	enum class Backend
+	{
+		Vulkan,
+		D3D12,
+		OpenGL
+	};
+
+	virtual ~RHIContext() = default;
 
 	virtual void Init() = 0;
 
@@ -20,7 +26,7 @@ public:
 
 	virtual void SwapBuffers() = 0;
 
-	static Scope<GraphicsContext> Create( void* window, GraphicsBackend api );
+	static Scope<RHIContext> Create( void* window, Backend backend );
 };
 
 #endif 
