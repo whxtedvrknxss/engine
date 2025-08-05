@@ -151,19 +151,10 @@ void Context::Init()
 	vkDestroyShaderModule( Device, vertex, nullptr );
 	vkDestroyShaderModule( Device, fragment, nullptr );
 
-	auto framebuffers_result = CreateFramebuffers();
-	if ( !framebuffers_result )
-	{
-		LOG_ERROR( "{}", framebuffers_result.error());
-		throw std::runtime_error( "Framebuffers == VK_NULL_HANDLE" );
-	}
-	Framebuffers = std::move( framebuffers_result.value() );
-	LOG_INFO( "[Vulkan] Successfully created Vulkan Framebuffers" );
-
 	auto command_pool_result = CreateCommandPool( indices );
 	if ( !command_pool_result )
 	{
-		LOG_ERROR( "{}", command_pool_result.error());
+		LOG_ERROR( "{}", command_pool_result.error() );
 		throw std::runtime_error( "CommandPool == VK_NULL_HANDLE" );
 	}
 	CommandPool = std::move( command_pool_result.value() );
@@ -196,6 +187,24 @@ void Context::Init()
 	Texture = std::move( texture_result.value() );
 	LOG_INFO( "[Vulkan] Successfully created Texture" );
 
+	auto depth_texture_result = CreateDepthTexture();
+	if ( !depth_texture_result )
+	{
+		LOG_ERROR( "{}", depth_texture_result.error() );
+		throw std::runtime_error( "depth texture == null" );
+	}
+	DepthTexture = std::move( depth_texture_result.value() );
+	LOG_INFO( "[Vulkan] Successfully creath depth texture." );
+
+	auto framebuffers_result = CreateFramebuffers();
+	if ( !framebuffers_result )
+	{
+		LOG_ERROR( "{}", framebuffers_result.error() );
+		throw std::runtime_error( "Framebuffers == VK_NULL_HANDLE" );
+	}
+	Framebuffers = std::move( framebuffers_result.value() );
+	LOG_INFO( "[Vulkan] Successfully created Vulkan Framebuffers" );
+
 	auto vertex_buffer_result = CreateVertexBuffer();
 	if ( !vertex_buffer_result )
 	{
@@ -208,7 +217,7 @@ void Context::Init()
 	auto index_buffer_result = CreateIndexBuffer();
 	if ( !index_buffer_result )
 	{
-		LOG_ERROR( "{}", index_buffer_result.error());
+		LOG_ERROR( "{}", index_buffer_result.error() );
 		throw std::runtime_error( "IndexBuffer == VK_NULL_HANDLE || IndexBufferMemory == VK_NULL_HANDLE" );
 	}
 	IndexBuffer = std::move( index_buffer_result.value() );
@@ -217,7 +226,7 @@ void Context::Init()
 	auto uniform_buffers_result = CreateUniformBuffers();
 	if ( !uniform_buffers_result )
 	{
-		LOG_ERROR( "{}", uniform_buffers_result.error());
+		LOG_ERROR( "{}", uniform_buffers_result.error() );
 		throw std::runtime_error( "UniformBuffers == VK_NULL_HANDLE" );
 	}
 	UniformBuffers = std::move( uniform_buffers_result.value() );
@@ -239,6 +248,7 @@ void Context::Cleanup()
 
 	vkDeviceWaitIdle( Device );
 
+	DepthTexture.Cleanup( Device );
 	CleanupSwapchain();
 
 	Texture.Cleanup( Device );
@@ -750,7 +760,7 @@ void Context::RecreateSwapchain()
 		LOG_ERROR( "{}", swapchain_result.error() );
 		throw std::runtime_error( "swapchain == VK_NULL_HANDLE" );
 	}
-	Swapchain = *swapchain_result;
+	Swapchain = std::move( swapchain_result.value() );
 
 	auto image_views_result = CreateImageViews();
 	if ( !image_views_result )
@@ -758,6 +768,13 @@ void Context::RecreateSwapchain()
 		LOG_ERROR( "{}", image_views_result.error() );
 	}
 	ImageViews = std::move( image_views_result.value() );
+
+	auto texture_result = CreateDepthTexture();
+	if ( !texture_result )
+	{
+		LOG_ERROR( "{}", texture_result.error() );
+	}
+	DepthTexture = std::move( texture_result.value() );
 
 	auto framebuffers_result = CreateFramebuffers();
 	if ( !framebuffers_result )
@@ -857,23 +874,49 @@ Expected<VulkanGraphicsPipeline> Context::CreateGraphicsPipeline( VkShaderModule
 	VkAttachmentReference color_attachment_ref = {};
 	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+	auto depth_format_result = FindDepthFormat();
+	if ( !depth_format_result )
+	{
+		return std::unexpected( depth_format_result.error() );
+	}
+	VkFormat depth_format = std::move( depth_format_result.value() );
+
+	VkAttachmentReference depth_attachment_ref = {};
+	depth_attachment_ref.attachment = 1;
+	depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentDescription depth_attachment = {};
+	depth_attachment.format = depth_format;
+	depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &color_attachment_ref;
+	subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
 	VkSubpassDependency subpass_dependency = {};
 	subpass_dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 	subpass_dependency.dstSubpass = 0;
-	subpass_dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpass_dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | 
+		                              VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 	subpass_dependency.srcAccessMask = 0;
-	subpass_dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	subpass_dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	subpass_dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | 
+								      VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	subpass_dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | 
+									   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
+	std::array<VkAttachmentDescription, 2> attachments = { color_attachment, depth_attachment };
 	VkRenderPassCreateInfo render_pass_info = {};
 	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	render_pass_info.attachmentCount = 1;
-	render_pass_info.pAttachments = &color_attachment;
+	render_pass_info.attachmentCount = static_cast<uint32>( attachments.size() );
+	render_pass_info.pAttachments = attachments.data();
 	render_pass_info.subpassCount = 1;
 	render_pass_info.pSubpasses = &subpass;
 	render_pass_info.dependencyCount = 1;
@@ -960,6 +1003,12 @@ Expected<VulkanGraphicsPipeline> Context::CreateGraphicsPipeline( VkShaderModule
 	colorblend_info.attachmentCount = 1;
 	colorblend_info.pAttachments = &colorblend_attachment;
 
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {};
+	depth_stencil_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depth_stencil_info.depthTestEnable = true;
+	depth_stencil_info.depthWriteEnable = true;
+	depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS;
+
 	VkGraphicsPipelineCreateInfo pipeline_info = {};
 	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipeline_info.stageCount = 2;
@@ -971,6 +1020,7 @@ Expected<VulkanGraphicsPipeline> Context::CreateGraphicsPipeline( VkShaderModule
 	pipeline_info.pMultisampleState = &multisampling_info;
 	pipeline_info.pColorBlendState = &colorblend_info;
 	pipeline_info.pDynamicState = &dynamic_state_info;
+	pipeline_info.pDepthStencilState = &depth_stencil_info;
 	pipeline_info.layout = graphics_pipeline.Layout;
 	pipeline_info.renderPass = graphics_pipeline.RenderPass;
 
@@ -990,42 +1040,54 @@ Expected<VulkanGraphicsPipeline> Context::CreateGraphicsPipeline( VkShaderModule
 }
 
 
+Expected<VkImageView> Context::CreateImageView( VkImage image, VkFormat format, VkImageAspectFlags aspect_flags )
+{
+	VkImageViewCreateInfo image_view_info = {};
+	image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	image_view_info.image = image;
+	image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	image_view_info.format = format;
+	image_view_info.components = {
+		VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY
+	};
+	VkImageSubresourceRange subresource_range = {
+		.aspectMask = aspect_flags,
+		.baseMipLevel = 0,
+		.levelCount = 1,
+		.baseArrayLayer = 0,
+		.layerCount = 1
+	};
+	image_view_info.subresourceRange = subresource_range;
+
+	const VkAllocationCallbacks* alloc = nullptr;
+	VkImageView view;
+	VkResult err = vkCreateImageView( Device, &image_view_info, alloc, &view );
+	if ( err != VK_SUCCESS )
+	{
+		std::string message = std::format(
+			"[Vulkan] Failed to create Vulkan Image View. vkCreateImageView returned: {}={}",
+			VK_TYPE_TO_STR( VkResult ),
+			err );
+		return std::unexpected( message );
+	}
+	return view;
+}
+
 Expected<std::vector<VkImageView>> Context::CreateImageViews()
 {
 	std::vector<VkImageView> image_views( Swapchain.Images.size() );
 
 	for ( size_t i = 0; i < Swapchain.Images.size(); ++i )
 	{
-		VkImageViewCreateInfo image_view_info = {};
-		image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		image_view_info.image = Swapchain.Images[i];
-		image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		image_view_info.format = Swapchain.Format;
-		image_view_info.components = {
-			VK_COMPONENT_SWIZZLE_IDENTITY,
-			VK_COMPONENT_SWIZZLE_IDENTITY,
-			VK_COMPONENT_SWIZZLE_IDENTITY,
-			VK_COMPONENT_SWIZZLE_IDENTITY
-		};
-		VkImageSubresourceRange subresource_range = {
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel = 0,
-			.levelCount = 1,
-			.baseArrayLayer = 0,
-			.layerCount = 1
-		};
-		image_view_info.subresourceRange = subresource_range;
-
-		const VkAllocationCallbacks* alloc = nullptr;
-		VkResult err = vkCreateImageView( Device, &image_view_info, alloc, &image_views[i] );
-		if ( err != VK_SUCCESS )
+		auto view_result = CreateImageView( Swapchain.Images[i], Swapchain.Format, VK_IMAGE_ASPECT_COLOR_BIT );
+		if ( !view_result )
 		{
-			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Image View. vkCreateImageView returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
-			return std::unexpected( message );
+			return std::unexpected( view_result.error() );
 		}
+		image_views[i] = std::move( view_result.value() );
 	}
 	return image_views;
 }
@@ -1035,15 +1097,16 @@ Expected<std::vector<VkFramebuffer>> Context::CreateFramebuffers()
 	std::vector<VkFramebuffer> framebuffers( ImageViews.size() );
 	for ( size_t i = 0; i < ImageViews.size(); i++ )
 	{
-		VkImageView attachments[] = {
-			ImageViews[i]
+		std::array<VkImageView, 2> attachments = {
+			ImageViews[i],
+			DepthTexture.View
 		};
 
 		VkFramebufferCreateInfo framebuffer_info = {};
 		framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		framebuffer_info.renderPass = GraphicsPipeline.RenderPass;
-		framebuffer_info.attachmentCount = 1;
-		framebuffer_info.pAttachments = attachments;
+		framebuffer_info.attachmentCount = static_cast<uint32>( attachments.size() );
+		framebuffer_info.pAttachments = attachments.data();
 		framebuffer_info.width = Swapchain.Extent.width;
 		framebuffer_info.height = Swapchain.Extent.height;
 		framebuffer_info.layers = 1;
@@ -1308,7 +1371,7 @@ Expected<VulkanBuffer> Context::CreateIndexBuffer()
 	{
 		return std::unexpected( index_buffer_result.error() );
 	}
-	VulkanBuffer index_buffer = index_buffer_result.value();
+	VulkanBuffer index_buffer = std::move( index_buffer_result.value() );
 
 	CopyBuffer( staging_buffer.Instance, index_buffer.Instance, buffer_size );
 
@@ -1358,7 +1421,8 @@ void Context::CopyBuffer( VkBuffer source, VkBuffer destination, VkDeviceSize si
 	auto command_buffer_result = BeginSingleTimeCommands();
 	if ( !command_buffer_result )
 	{
-		
+		LOG_ERROR( "{}", command_buffer_result.error() );
+		throw std::runtime_error( "BeginSingleTimeCommands failed" );
 	}
 	VkCommandBuffer command_buffer = std::move( command_buffer_result.value() );
 
@@ -1514,7 +1578,7 @@ Expected<VulkanTexture> Context::CreateTexture()
 	{
 		return std::unexpected( staging_buffer_result.error() );
 	}
-	VulkanBuffer staging_buffer = staging_buffer_result.value();
+	VulkanBuffer staging_buffer = std::move( staging_buffer_result.value() );
 
 	const VkDeviceSize offset = 0;
 	const VkMemoryMapFlags memory_flags = 0;
@@ -1561,30 +1625,12 @@ Expected<VulkanTexture> Context::CreateTexture()
 	vkDestroyBuffer( Device, staging_buffer.Instance, alloc );
 	vkFreeMemory( Device, staging_buffer.Memory, alloc );
 
-	VkImageViewCreateInfo view_info = {};
-	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	view_info.image = texture.Image;
-	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	view_info.format = VK_FORMAT_R8G8B8A8_SRGB;
-
-	VkImageSubresourceRange subresource_range = {};
-	subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	subresource_range.baseMipLevel = 0;
-	subresource_range.levelCount = 1;
-	subresource_range.baseArrayLayer = 0;
-	subresource_range.layerCount = 1;
-
-	view_info.subresourceRange = subresource_range;
-
-	err = vkCreateImageView( Device, &view_info, alloc, &texture.View );
-	if ( err != VK_SUCCESS )
+	auto view_result = CreateImageView( texture.Image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT );
+	if ( !view_result )
 	{
-		std::string message = std::format(
-			"[Vulkan] Failed to create Vulkan texture image view. vkCreateImageView returned {}={}.",
-			VK_TYPE_TO_STR( VkResult ),
-			err );
-		return std::unexpected( message );
+		return std::unexpected( view_result.error() );
 	}
+	texture.View = std::move( view_result.value() );
 
 	VkSamplerCreateInfo sampler_info = {};
 	sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1682,6 +1728,40 @@ Expected<VulkanTexture> Context::CreateTextureImage( int32 width, int32 height,
 	return texture;
 }
 
+Expected<VulkanTexture> Context::CreateDepthTexture()
+{
+	VkResult err;
+
+	auto format_result = FindDepthFormat();
+	if ( !format_result )
+	{
+		return std::unexpected( format_result.error() );
+	}
+	VkFormat format = format_result.value();
+
+	const int32 width = Swapchain.Extent.width;
+	const int32 height = Swapchain.Extent.height;
+	auto texture_image_result = CreateTextureImage( width, height, format, VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	if ( !texture_image_result )
+	{
+		return std::unexpected( texture_image_result.error() );
+	}
+	VulkanTexture texture = std::move( texture_image_result.value() );
+
+	auto view_result = CreateImageView( texture.Image, format, VK_IMAGE_ASPECT_DEPTH_BIT );
+	if ( !view_result )
+	{
+		return std::unexpected( view_result.error() );
+	}
+	texture.View = std::move( view_result.value() );
+
+	TransitionImageLayout( texture, format, VK_IMAGE_LAYOUT_UNDEFINED, 
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+
+	return texture;
+}
+
 void Context::RecordCommandBuffer( uint32 image_index )
 {
 	VkResult err;
@@ -1706,9 +1786,12 @@ void Context::RecordCommandBuffer( uint32 image_index )
 	render_pass_info.renderArea.offset = { 0,0 };
 	render_pass_info.renderArea.extent = Swapchain.Extent;
 
-	VkClearValue color = { {{ 0.0f, 0.0f, 0.0f, 1.0f }} };
-	render_pass_info.clearValueCount = 1;
-	render_pass_info.pClearValues = &color;
+	std::array<VkClearValue, 2> colors = {};
+	colors[0].color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
+	colors[1].depthStencil = { 1.0f, 0 };
+
+	render_pass_info.clearValueCount = static_cast<uint32>( colors.size() );
+	render_pass_info.pClearValues = colors.data();
 
 	vkCmdBeginRenderPass( CommandBuffers[CurrentFrame], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE );
 	vkCmdBindPipeline( CommandBuffers[CurrentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1890,6 +1973,21 @@ void Context::TransitionImageLayout( const VulkanTexture& texture, VkFormat form
 
 	VkPipelineStageFlags source_stage;
 	VkPipelineStageFlags destination_stage;
+
+	if ( new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL )
+	{
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+		if ( format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT )
+		{
+			barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+	}
+	else
+	{
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	}
+
 	if ( old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL )
 	{
 		barrier.srcAccessMask = 0;
@@ -1907,15 +2005,21 @@ void Context::TransitionImageLayout( const VulkanTexture& texture, VkFormat form
 		source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	}
+	else if ( old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
+		new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL )
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+
+		source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		destination_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	}
 	else
 	{
 		throw std::runtime_error( "unsupported layout transition" );
 	}
 
-	vkCmdPipelineBarrier(
-		command_buffer,
-		source_stage, destination_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier );
-
+	vkCmdPipelineBarrier( command_buffer, source_stage, destination_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier );
 	EndSingleTimeCommands( command_buffer );
 }
 

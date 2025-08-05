@@ -17,8 +17,9 @@
 
 struct SDL_Window;
 
-namespace VulkanRHI
+namespace VulkanRHI 
 {
+
 	template<typename VkType>
 	using Expected = std::expected<VkType, std::string>;
 
@@ -97,12 +98,12 @@ namespace VulkanRHI
 	{
 		VkImage        Image;
 		VkImageView    View;
-		VkSampler      Sampler;
+		VkSampler      Sampler=VK_NULL_HANDLE;
 		VkDeviceMemory Memory;
 
 		void inline Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
-			vkDestroySampler( device, Sampler, alloc );
+			if ( Sampler ) vkDestroySampler( device, Sampler, alloc );
 			vkDestroyImageView( device, View, alloc );
 			vkDestroyImage( device, Image, alloc );
 			vkFreeMemory( device, Memory, alloc );
@@ -156,6 +157,7 @@ namespace VulkanRHI
 		Expected<VulkanGraphicsPipeline> CreateGraphicsPipeline( VkShaderModule vertex,
 			VkShaderModule fragment );
 
+		Expected<VkImageView> CreateImageView( VkImage image, VkFormat format, VkImageAspectFlags aspect_flags );
 		Expected<std::vector<VkImageView>>   CreateImageViews();
 		Expected<std::vector<VkFramebuffer>> CreateFramebuffers();
 
@@ -180,6 +182,8 @@ namespace VulkanRHI
 		Expected<VulkanTexture> CreateTexture();
 		Expected<VulkanTexture> CreateTextureImage( int32 width, int32 height, VkFormat format,
 			VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memory_props );
+
+		Expected<VulkanTexture> CreateDepthTexture();
 
 		void RecordCommandBuffer( uint32 image_index );
 
