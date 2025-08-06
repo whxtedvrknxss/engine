@@ -1,13 +1,10 @@
 #include "RHI.h"
-
-#if defined ( VULKAN_SUPPORTED )
-#include <SDL3/SDL_vulkan.h>
-#endif
-
 #include "Engine/Core/Assert.h"
 
 #if defined( VULKAN_SUPPORTED )
-#include "Platform/Vulkan/VulkanRHI.h"
+#include <SDL3/SDL_vulkan.h>
+
+#include "Platform/VulkanRHI/VulkanRHI.h"
 #endif 
 
 Scope<RHIContext> RHIContext::Create( void* window, RHIContext::Backend backend )
@@ -21,7 +18,7 @@ Scope<RHIContext> RHIContext::Create( void* window, RHIContext::Backend backend 
             char const* const* extensions = SDL_Vulkan_GetInstanceExtensions( &extensions_count );
 
             // TODO
-            VulkanRHI::ContextCreateInfo context_info = {
+            VulkanContextCreateInfo context_info = {
                 .ApiMajorVersion = 1,
                 .ApiMinorVersion = 2,
                 .Extensions = std::vector( extensions, extensions + extensions_count ),

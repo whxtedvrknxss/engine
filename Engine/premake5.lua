@@ -23,14 +23,17 @@ project "Engine"
         IncludeDir["glm"],
         IncludeDir["imgui"],
         IncludeDir["stb_image"],
+        IncludeDir["tinyobjloader"],
         IncludeDir["VulkanSDK"],
-        IncludeDir["sdl"]
+        IncludeDir["sdl"],
+        IncludeDir["spdlog"]
     }
 
     links 
     {
         "imgui",
         "sdl",
+        "spdlog",
         Library["Vulkan"]
     }
 
@@ -53,8 +56,8 @@ project "Engine"
     {
         "Source/Platform/Windows/**.h",
         "Source/Platform/Windows/**.cpp",
-        "Source/Platform/Vulkan/**.h",
-        "Source/Platform/Vulkan/**.cpp"
+        "Source/Platform/VulkanRHI/**.h",
+        "Source/Platform/VulkanRHI/**.cpp"
     }
 
     filter "configurations:Debug"

@@ -56,7 +56,9 @@ int32 Application::Run()
 
         if ( elapsed >= 1.0f )
         {
-            SDL_SetWindowTitle( ( SDL_Window* ) Window->GetNativeWindow(), std::format( "{} fps", frame_count ).c_str() );
+            SDL_SetWindowTitle( 
+                ( SDL_Window* ) Window->GetNativeWindow(), 
+                std::format( "{} fps", frame_count ).c_str() );
             frame_count = 0;
             last_time = current_time;
         }

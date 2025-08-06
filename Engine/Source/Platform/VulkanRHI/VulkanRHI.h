@@ -1,21 +1,29 @@
 // Source/Engine/Platform/Core/VulkanContext.h 
 
-#ifndef __renderer_vulkan_context_h_included__
-#define __renderer_vulkan_context_h_included__  
+#pragma once
 
+#include <span>
 #include <vector>
+#include <string>
 #include <utility>
 #include <optional>
-#include <string>
-
 #include <expected>
 
 #include <vulkan/vulkan.h>
 
 #include "Engine/RHI/RHI.h"
-#include <span>
 
 struct SDL_Window;
+
+struct VulkanContextCreateInfo
+{
+	int32 ApiMajorVersion;
+	int32 ApiMinorVersion;
+	std::vector<const char*> Extensions;
+	std::vector<const char*> Layers;
+	const char* ApplicationName;
+	const char* EngineName;
+};
 
 namespace VulkanRHI 
 {
@@ -23,17 +31,7 @@ namespace VulkanRHI
 	template<typename VkType>
 	using Expected = std::expected<VkType, std::string>;
 
-	struct ContextCreateInfo
-	{
-		int32 ApiMajorVersion;
-		int32 ApiMinorVersion;
-		std::vector<const char*> Extensions;
-		std::vector<const char*> Layers;
-		const char* ApplicationName;
-		const char* EngineName;
-	};
-
-	struct QueueFamilyIndices
+	struct VulkanQueueFamilyIndices
 	{
 		std::optional<uint32> Graphics;
 		std::optional<uint32> Present;
@@ -44,22 +42,39 @@ namespace VulkanRHI
 		}
 	};
 
-	struct VulkanSwapchain 
+	struct VulkanSwapchain
 	{
-		VkSwapchainKHR Instance;
-		VkFormat       Format;
-		VkExtent2D     Extent;
+		VkSwapchainKHR Instance = VK_NULL_HANDLE;
+		VkFormat       Format = VK_FORMAT_UNDEFINED;
+		VkExtent2D     Extent = {};
 		std::vector<VkImage> Images;
+		std::vector<VkImageView> ImageViews;
+		std::vector<VkFramebuffer> Framebuffers;
+
+		void Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		{
+			for ( auto framebuffer : Framebuffers )
+			{
+				vkDestroyFramebuffer( device, framebuffer, alloc );
+			}
+
+			for ( auto image_view : ImageViews )
+			{
+				vkDestroyImageView( device, image_view, alloc );
+			}
+
+			vkDestroySwapchainKHR( device, Instance, alloc );
+		}
 	};
 
 	struct VulkanGraphicsPipeline
 	{
-		VkRenderPass     RenderPass;
-		VkPipelineLayout Layout;
-		VkPipeline       Instance;
-		VkDescriptorSetLayout DescriptorSetLayout;
+		VkRenderPass     RenderPass = VK_NULL_HANDLE;
+		VkPipelineLayout Layout = VK_NULL_HANDLE;
+		VkPipeline       Instance = VK_NULL_HANDLE;
+		VkDescriptorSetLayout DescriptorSetLayout = VK_NULL_HANDLE;
 
-		void inline Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		void Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
 			vkDestroyDescriptorSetLayout( device, DescriptorSetLayout, alloc );
 			vkDestroyPipeline( device, Instance, alloc );
@@ -70,16 +85,16 @@ namespace VulkanRHI
 
 	struct VulkanSyncObjects
 	{
-		VkSemaphore ImageAvailableSemaphores;
-		VkSemaphore RenderFinishedSemaphores;
-		VkFence InFlightFences;
+		VkSemaphore ImageAvailableSemaphores = VK_NULL_HANDLE;
+		VkSemaphore RenderFinishedSemaphores = VK_NULL_HANDLE;
+		VkFence InFlightFences = VK_NULL_HANDLE;
 	};
 
 	struct VulkanBuffer
 	{
-		VkBuffer       Instance;
-		VkDeviceMemory Memory;
-		void* Mapped;
+		VkBuffer       Instance = VK_NULL_HANDLE;
+		VkDeviceMemory Memory = VK_NULL_HANDLE;
+		void*		   Mapped = nullptr;
 
 		void inline Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
@@ -90,20 +105,23 @@ namespace VulkanRHI
 
 	struct VulkanDescriptorGroup
 	{
-		VkDescriptorPool             Pool;
+		VkDescriptorPool             Pool = VK_NULL_HANDLE;
 		std::vector<VkDescriptorSet> Sets;
 	};
 
 	struct VulkanTexture
 	{
-		VkImage        Image;
-		VkImageView    View;
-		VkSampler      Sampler=VK_NULL_HANDLE;
-		VkDeviceMemory Memory;
+		VkImage        Image = VK_NULL_HANDLE;
+		VkImageView    View = VK_NULL_HANDLE;
+		VkSampler      Sampler = VK_NULL_HANDLE;
+		VkDeviceMemory Memory = VK_NULL_HANDLE;
 
-		void inline Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		void Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
-			if ( Sampler ) vkDestroySampler( device, Sampler, alloc );
+			if ( Sampler )
+			{
+				vkDestroySampler( device, Sampler, alloc );
+			}
 			vkDestroyImageView( device, View, alloc );
 			vkDestroyImage( device, Image, alloc );
 			vkFreeMemory( device, Memory, alloc );
@@ -113,7 +131,7 @@ namespace VulkanRHI
 	class Context : public RHIContext
 	{
 	public:
-		Context( ContextCreateInfo& context_info, SDL_Window* window );
+		Context( VulkanContextCreateInfo& context_info, SDL_Window* window );
 		~Context();
 
 		void Init() override;
@@ -128,7 +146,7 @@ namespace VulkanRHI
 
 		void EndFrame() override
 		{
-			vkDeviceWaitIdle( Device );
+			//vkDeviceWaitIdle( Device );
 		}
 
 		void SwapBuffers() override
@@ -140,17 +158,18 @@ namespace VulkanRHI
 		static bool IsExtensionAvailable( const std::vector<VkExtensionProperties>& props,
 			const char* extension );
 		static bool IsLayerAvailable( const std::vector<VkLayerProperties>& props, const char* layer );
-		static QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice device, VkSurfaceKHR surface );
+
+		static Expected<VulkanQueueFamilyIndices> FindQueueFamilies( VkPhysicalDevice device, 
+			VkSurfaceKHR surface );
 
 	private:
 		Expected<VkInstance>       CreateInstance();
 		Expected<VkSurfaceKHR>     CreateSurface();
 		Expected<VkPhysicalDevice> SelectPhysicalDevice();
-		Expected<VkDevice>         CreateDevice( QueueFamilyIndices indices );
+		Expected<VkDevice>         CreateDevice( VulkanQueueFamilyIndices indices );
 		VkQueue          GetQueue( uint32 family_index, uint32 index );
 
 		Expected<VulkanSwapchain>  CreateSwapchain();
-		void CleanupSwapchain();
 		void RecreateSwapchain();
 
 		VkShaderModule         CreateShaderModule( const std::vector<char>& code );
@@ -161,7 +180,7 @@ namespace VulkanRHI
 		Expected<std::vector<VkImageView>>   CreateImageViews();
 		Expected<std::vector<VkFramebuffer>> CreateFramebuffers();
 
-		Expected<VkCommandPool> CreateCommandPool( QueueFamilyIndices indices );
+		Expected<VkCommandPool> CreateCommandPool( VulkanQueueFamilyIndices indices );
 		std::vector<VkCommandBuffer> CreateCommandBuffers();
 
 		Expected<std::vector<VulkanSyncObjects>> CreateSyncObjects();
@@ -190,8 +209,8 @@ namespace VulkanRHI
 		Expected<VkCommandBuffer> BeginSingleTimeCommands();
 		void EndSingleTimeCommands( VkCommandBuffer command_buffer );
 
-		void TransitionImageLayout( const VulkanTexture& texture, VkFormat format,
-			VkImageLayout old_layout, VkImageLayout new_layout );
+		void TransitionImageLayout( const VulkanTexture& texture, VkFormat format,VkImageLayout old_layout,
+			VkImageLayout new_layout );
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32 width, uint32 height );
 
 		Expected<VkFormat> FindSupportedFormat( std::span<const VkFormat> candidates,
@@ -199,7 +218,7 @@ namespace VulkanRHI
 		Expected<VkFormat> FindDepthFormat();
 
 	private:
-		ContextCreateInfo ContextInfo;
+		VulkanContextCreateInfo ContextInfo;
 		SDL_Window* WindowHandle;
 
 	private:
@@ -217,15 +236,11 @@ namespace VulkanRHI
 
 		VulkanSwapchain Swapchain;
 
-		std::vector<VkImageView>   ImageViews;
-		std::vector<VkFramebuffer> Framebuffers;
-
 		std::vector<VulkanSyncObjects> SyncObjects;
 
 		VulkanBuffer VertexBuffer;
 		VulkanBuffer IndexBuffer;
 		std::vector<VulkanBuffer> UniformBuffers;
-		VulkanBuffer StagingBuffer;
 
 		VulkanDescriptorGroup DescriptorGroup;
 
@@ -239,5 +254,4 @@ namespace VulkanRHI
 
 } // namespace VulkanRHI
 
-#endif 
 

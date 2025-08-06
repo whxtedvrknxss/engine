@@ -13,3 +13,6 @@
 [submodule "Engine/external/hidapi"]
 	path = Engine/external/hidapi
 	url = https://github.com/whxtedvrknxss/hidapi
+[submodule "Engine/external/tinyobjloader"]
+	path = Engine/external/tinyobjloader
+	url = https://github.com/whxtedvrknxss/tinyobjloader

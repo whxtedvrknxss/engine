@@ -1,7 +1,7 @@
 // src/Engine/Renderer/Core/GraphicsContext.h
 
-#ifndef __renderer_graphics_context_h_included__
-#define __renderer_graphics_context_h_included__
+#ifndef __rhi_context_h_included__
+#define __rhi_context_h_included__
 
 #include "Engine/Core/Common.h"
 

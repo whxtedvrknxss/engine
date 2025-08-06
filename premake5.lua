@@ -17,6 +17,8 @@ workspace "Engine"
     IncludeDir["imgui"] = "%{wks.location}/Engine/external/imgui"
     IncludeDir["sdl"] = "%{wks.location}/Engine/external/sdl/include"
     IncludeDir["stb_image"] = "%{wks.location}/Engine/external/stb_image"
+    IncludeDir["tinyobjloader"] = "%{wks.location}/Engine/external/tinyobjloader"
+    IncludeDir["spdlog"] = "%{wks.location}/Engine/external/spdlog/include"
     IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 
     LibraryDir = {}
@@ -35,3 +37,4 @@ workspace "Engine"
     group "Dependencies"
         include "Engine/external/imgui"
         include "Engine/external/sdl"
+        include "Engine/external/spdlog"
