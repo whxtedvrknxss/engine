@@ -23,7 +23,7 @@ WindowsWindow::WindowsWindow( const WindowCreateInfo& create_info )
     }
     catch ( const std::exception& ex )
     {
-		LOG_ERROR( "{}", ex.what() );
+		LOG_ERROR( ex.what() );
     }
 }
 
@@ -42,7 +42,7 @@ void WindowsWindow::OnUpdate()
     }
     catch ( const std::exception& ex )
     {
-		LOG_ERROR( "{}", ex.what() );
+		LOG_ERROR( ex.what() );
     }
 }
 

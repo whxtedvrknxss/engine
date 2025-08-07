@@ -4,6 +4,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <expected>
+#include <algorithm>
 
 #include <SDL3/SDL_vulkan.h>
 
@@ -31,7 +32,7 @@ namespace VulkanRHI
 
 		Instance = VK_NULL_HANDLE;
 		Surface = VK_NULL_HANDLE;
-		PhysicalDevice = VK_NULL_HANDLE;
+		Gpu = VK_NULL_HANDLE;
 		Device = VK_NULL_HANDLE;
 		GraphicsQueue = VK_NULL_HANDLE;
 		PresentQueue = VK_NULL_HANDLE;
@@ -48,34 +49,34 @@ namespace VulkanRHI
 		auto instance_result = CreateInstance();
 		if ( !instance_result )
 		{
-			LOG_ERROR( "{}", instance_result.error() );
+			LOG_ERROR( instance_result.error() );
 			throw std::runtime_error( "Instance == VK_NULL_HANDLE" );
 		}
 		Instance = std::move( instance_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Instance." );
+		LOG_INFO( "[Vulkan] Created Instance." );
 
 		auto surface_result = CreateSurface();
 		if ( !surface_result )
 		{
-			LOG_ERROR( "{}", surface_result.error() );
+			LOG_ERROR( surface_result.error() );
 			throw std::runtime_error( "Surface == VK_NULL_HANDLE" );
 		}
 		Surface = std::move( surface_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created surface." );
+		LOG_INFO( "[Vulkan] Created surface." );
 
 		auto physical_device_result = SelectPhysicalDevice();
 		if ( !physical_device_result )
 		{
-			LOG_ERROR( "{}", physical_device_result.error() );
+			LOG_ERROR( physical_device_result.error() );
 			throw std::runtime_error( "PhysicalDevice == VK_NULL_HANDLE" );
 		}
-		PhysicalDevice = std::move( physical_device_result.value() );
-		LOG_INFO( "[Vulkan] Successfully selected Physical Device." );
+		Gpu = std::move( physical_device_result.value() );
+		LOG_INFO( "[Vulkan] Selected GPU." );
 
-		auto indices_result = FindQueueFamilies( PhysicalDevice, Surface );
+		auto indices_result = FindQueueFamilies( Gpu, Surface );
 		if ( !indices_result )
 		{
-			LOG_ERROR( "{}", indices_result.error() );
+			LOG_ERROR( indices_result.error() );
 			throw std::runtime_error( "queue families invalid" );
 		}
 		VulkanQueueFamilyIndices indices = std::move( indices_result.value() );
@@ -85,11 +86,11 @@ namespace VulkanRHI
 		auto device_result = CreateDevice( indices );
 		if ( !device_result )
 		{
-			LOG_ERROR( "{}", device_result.error() );
+			LOG_ERROR( device_result.error() );
 			throw std::runtime_error( "Device == VK_NULL_HANDLE" );
 		}
 		Device = std::move( device_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Device." );
+		LOG_INFO( "[Vulkan] Created Device." );
 
 		GraphicsQueue = GetQueue( indices.Graphics.value(), 0 );
 		if ( GraphicsQueue == VK_NULL_HANDLE )
@@ -106,45 +107,51 @@ namespace VulkanRHI
 		auto swapchain_result = CreateSwapchain();
 		if ( !swapchain_result )
 		{
-			LOG_ERROR( "{}", swapchain_result.error() );
+			LOG_ERROR( swapchain_result.error() );
 			throw std::runtime_error( "Swapchain == VK_NULL_HANDLE || SwapchainImages.size == 0" );
 		}
 		Swapchain = std::move( swapchain_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Swapchain." );
+		LOG_INFO( "[Vulkan] Created Swapchain." );
 
 		auto image_views_result = CreateImageViews();
 		if ( !image_views_result )
 		{
-			LOG_ERROR( "{}", image_views_result.error() );
+			LOG_ERROR( image_views_result.error() );
 			throw std::runtime_error( "ImageViews == null" );
 		}
 		Swapchain.ImageViews = std::move( image_views_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Image Views" );
+		LOG_INFO( "[Vulkan] Created Image Views" );
 
 		auto shaders_path = std::filesystem::current_path().parent_path() / "Engine" / "Shaders";
 		auto vertex_shader = GetShaderSource( shaders_path / "triangle.vert.spv" );
 		auto fragment_shader = GetShaderSource( shaders_path / "triangle.frag.spv" );
 
-		VkShaderModule vertex = CreateShaderModule( vertex_shader );
-		if ( vertex == VK_NULL_HANDLE )
+		auto vertex_module_result = CreateShaderModule( vertex_shader );
+		if ( !vertex_module_result )
 		{
+			LOG_ERROR( vertex_module_result.error() );
 			throw std::runtime_error( "vertex == VK_NULL_HANDLE" );
 		}
+		VkShaderModule vertex = std::move( vertex_module_result.value() );
+		LOG_INFO( "[Vulkan] Vertex shader loaded." );
 
-		VkShaderModule fragment = CreateShaderModule( fragment_shader );
-		if ( fragment == VK_NULL_HANDLE )
+		auto fragment_module_result = CreateShaderModule( fragment_shader );
+		if ( !fragment_module_result )
 		{
+			LOG_ERROR( fragment_module_result.error() );
 			throw std::runtime_error( "fragment == VK_NULL_HANDLE" );
 		}
+		VkShaderModule fragment = std::move( fragment_module_result.value() );
+		LOG_INFO( "[Vulkan] Fragment shader loaded." );
 
 		auto graphics_pipeline_result = CreateGraphicsPipeline( vertex, fragment );
 		if ( !graphics_pipeline_result )
 		{
-			LOG_ERROR( "{}", graphics_pipeline_result.error() );
+			LOG_ERROR( graphics_pipeline_result.error() );
 			throw std::runtime_error( "GraphicsPipeline == VK_NULL_HANDLE" );
 		}
 		GraphicsPipeline = std::move( graphics_pipeline_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Graphics Pipeline." );
+		LOG_INFO( "[Vulkan] Created Graphics Pipeline." );
 
 		vkDestroyShaderModule( Device, vertex, nullptr );
 		vkDestroyShaderModule( Device, fragment, nullptr );
@@ -152,92 +159,91 @@ namespace VulkanRHI
 		auto command_pool_result = CreateCommandPool( indices );
 		if ( !command_pool_result )
 		{
-			LOG_ERROR( "{}", command_pool_result.error() );
+			LOG_ERROR( command_pool_result.error() );
 			throw std::runtime_error( "CommandPool == VK_NULL_HANDLE" );
 		}
 		CommandPool = std::move( command_pool_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Command Pool." );
+		LOG_INFO( "[Vulkan] Created Command Pool." );
 
-		CommandBuffers = CreateCommandBuffers();
-		for ( int32 i = 0; i < CommandBuffers.size(); ++i )
+		auto cmd_buffers_result = CreateCommandBuffers();
+		if ( !cmd_buffers_result )
 		{
-			if ( CommandBuffers[i] == VK_NULL_HANDLE )
-			{
-				throw std::runtime_error( "CommandBuffer == VK_NULL_HANDLE" );
-			}
+			LOG_ERROR( cmd_buffers_result.error() );
+			throw std::runtime_error( "CommandBuffer == VK_NULL_HANDLE" );
 		}
+		CommandBuffers = std::move( cmd_buffers_result.value() );
 
 		auto sync_objects_result = CreateSyncObjects();
 		if ( !sync_objects_result )
 		{
-			LOG_ERROR( "{}", sync_objects_result.error() );
+			LOG_ERROR( sync_objects_result.error() );
 			throw std::runtime_error( "synchronization objects are invalid" );
 		}
 		SyncObjects = std::move( sync_objects_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Synchronization objects." );
+		LOG_INFO( "[Vulkan] Created Synchronization objects." );
 
 		auto texture_result = CreateTexture();
 		if ( !texture_result )
 		{
-			LOG_ERROR( "{}", texture_result.error() );
+			LOG_ERROR( texture_result.error() );
 			throw std::runtime_error( "texture image == VK_NULL_HANDLE" );
 		}
 		Texture = std::move( texture_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Texture" );
+		LOG_INFO( "[Vulkan] Created Texture" );
 
 		auto depth_texture_result = CreateDepthTexture();
 		if ( !depth_texture_result )
 		{
-			LOG_ERROR( "{}", depth_texture_result.error() );
+			LOG_ERROR( depth_texture_result.error() );
 			throw std::runtime_error( "depth texture == null" );
 		}
 		DepthTexture = std::move( depth_texture_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created depth texture." );
+		LOG_INFO( "[Vulkan] Created depth texture." );
 
 		auto framebuffers_result = CreateFramebuffers();
 		if ( !framebuffers_result )
 		{
-			LOG_ERROR( "{}", framebuffers_result.error() );
+			LOG_ERROR( framebuffers_result.error() );
 			throw std::runtime_error( "Framebuffers == VK_NULL_HANDLE" );
 		}
 		Swapchain.Framebuffers = std::move( framebuffers_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Vulkan Framebuffers" );
+		LOG_INFO( "[Vulkan] Created Vulkan Framebuffers" );
 
 		auto vertex_buffer_result = CreateVertexBuffer();
 		if ( !vertex_buffer_result )
 		{
-			LOG_ERROR( "{}", vertex_buffer_result.error() );
+			LOG_ERROR( vertex_buffer_result.error() );
 			throw std::runtime_error( "VertexBuffer == VK_NULL_HANDLE || VertexBufferMemory == VK_NULL_HANDLE" );
 		}
 		VertexBuffer = std::move( vertex_buffer_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Vertex Buffer." );
+		LOG_INFO( "[Vulkan] Created Vertex Buffer." );
 
 		auto index_buffer_result = CreateIndexBuffer();
 		if ( !index_buffer_result )
 		{
-			LOG_ERROR( "{}", index_buffer_result.error() );
+			LOG_ERROR( index_buffer_result.error() );
 			throw std::runtime_error( "IndexBuffer == VK_NULL_HANDLE || IndexBufferMemory == VK_NULL_HANDLE" );
 		}
 		IndexBuffer = std::move( index_buffer_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Index Buffer." );
+		LOG_INFO( "[Vulkan] Created Index Buffer." );
 
 		auto uniform_buffers_result = CreateUniformBuffers();
 		if ( !uniform_buffers_result )
 		{
-			LOG_ERROR( "{}", uniform_buffers_result.error() );
+			LOG_ERROR( uniform_buffers_result.error() );
 			throw std::runtime_error( "UniformBuffers == VK_NULL_HANDLE" );
 		}
 		UniformBuffers = std::move( uniform_buffers_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Uniform Buffers." );
+		LOG_INFO( "[Vulkan] Created Uniform Buffers." );
 
 		auto descriptor_group_result = CreateDescriptorGroup();
 		if ( !descriptor_group_result )
 		{
-			LOG_ERROR( "{}", descriptor_group_result.error() );
+			LOG_ERROR( descriptor_group_result.error() );
 			throw std::runtime_error( "DescriptorPool == VK_NULL_HANDLE" );
 		}
 		DescriptorGroup = std::move( descriptor_group_result.value() );
-		LOG_INFO( "[Vulkan] Successfully created Descriptor group." );
+		LOG_INFO( "[Vulkan] Created Descriptor group." );
 	}
 
 	void Context::Cleanup()
@@ -246,28 +252,26 @@ namespace VulkanRHI
 
 		vkDeviceWaitIdle( Device );
 
-		DepthTexture.Cleanup( Device );
-		Swapchain.Cleanup( Device );
+		DepthTexture.Destroy( Device );
+		Swapchain.Destroy( Device );
 
-		Texture.Cleanup( Device );
+		Texture.Destroy( Device );
 
 		vkDestroyDescriptorPool( Device, DescriptorGroup.Pool, alloc );
 
-		for ( size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i )
+		for ( auto& uniform_buf : UniformBuffers )
 		{
-			UniformBuffers[i].Cleanup( Device );
+			uniform_buf.Destroy( Device );
 		}
 
-		IndexBuffer.Cleanup( Device );
-		VertexBuffer.Cleanup( Device );
+		IndexBuffer.Destroy( Device );
+		VertexBuffer.Destroy( Device );
 
-		GraphicsPipeline.Cleanup( Device );
+		GraphicsPipeline.Destroy( Device );
 
-		for ( size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i )
+		for ( auto& obj : SyncObjects )
 		{
-			vkDestroySemaphore( Device, SyncObjects[i].ImageAvailableSemaphores, alloc );
-			vkDestroySemaphore( Device, SyncObjects[i].RenderFinishedSemaphores, alloc );
-			vkDestroyFence( Device, SyncObjects[i].InFlightFences, alloc );
+			obj.Destroy( Device );
 		}
 
 		vkDestroyCommandPool( Device, CommandPool, alloc );
@@ -281,11 +285,12 @@ namespace VulkanRHI
 	{
 		VkResult err;
 
+		const auto& [image_available, render_finished, in_flight] = SyncObjects[CurrentFrame];
+
 		const uint32   fence_count = 1;
-		const VkBool32 wait_all = VK_TRUE;
+		const VkBool32 wait_all = true;
 		const uint64   timeout = UINT64_MAX;
-		err = vkWaitForFences( Device, fence_count, &SyncObjects[CurrentFrame].InFlightFences, wait_all,
-			timeout );
+		err = vkWaitForFences( Device, fence_count, &in_flight, wait_all, timeout );
 		if ( err != VK_SUCCESS )
 		{
 			LOG_ERROR( "[Vulkan] Error from vkWaitForFences: {}.", err );
@@ -293,8 +298,7 @@ namespace VulkanRHI
 
 		uint32  image_index;
 		VkFence FENCE = VK_NULL_HANDLE;
-		err = vkAcquireNextImageKHR( Device, Swapchain.Instance, timeout,
-			SyncObjects[CurrentFrame].ImageAvailableSemaphores, FENCE, &image_index );
+		err = vkAcquireNextImageKHR( Device, Swapchain.Instance, timeout, image_available, FENCE, &image_index );
 		if ( err == VK_ERROR_OUT_OF_DATE_KHR )
 		{
 			RecreateSwapchain();
@@ -307,7 +311,7 @@ namespace VulkanRHI
 
 		UpdateUniformBuffer( CurrentFrame );
 
-		err = vkResetFences( Device, fence_count, &SyncObjects[CurrentFrame].InFlightFences );
+		err = vkResetFences( Device, fence_count, &in_flight );
 		if ( err != VK_SUCCESS )
 		{
 			LOG_ERROR( "[Vulkan] Error from vkResetFences: {}.", err );
@@ -316,14 +320,14 @@ namespace VulkanRHI
 		err = vkResetCommandBuffer( CommandBuffers[CurrentFrame], 0 );
 		if ( err != VK_SUCCESS )
 		{
-			LOG_ERROR( "[Vulkan] Error from vkResetCommandBuffer: {}.", err  );
+			LOG_ERROR( "[Vulkan] Error from vkResetCommandBuffer: {}.", err );
 		}
 		RecordCommandBuffer( image_index );
 
 		VkSubmitInfo submit_info = {};
 		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		std::array<VkSemaphore, 1> wait_semaphores = { SyncObjects[CurrentFrame].ImageAvailableSemaphores };
+		std::array<VkSemaphore, 1> wait_semaphores = { image_available };
 		VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 		submit_info.waitSemaphoreCount = static_cast<uint32>( wait_semaphores.size() );
 		submit_info.pWaitSemaphores = wait_semaphores.data();
@@ -331,13 +335,12 @@ namespace VulkanRHI
 		submit_info.commandBufferCount = 1;
 		submit_info.pCommandBuffers = &CommandBuffers[CurrentFrame];
 
-		std::array<VkSemaphore, 1> signal_semaphores = { SyncObjects[CurrentFrame].RenderFinishedSemaphores };
+		std::array<VkSemaphore, 1> signal_semaphores = { render_finished };
 		submit_info.signalSemaphoreCount = static_cast<uint32>( signal_semaphores.size() );
 		submit_info.pSignalSemaphores = signal_semaphores.data();
 
 		const uint32 submit_count = 1;
-		err = vkQueueSubmit( GraphicsQueue, submit_count, &submit_info, 
-			SyncObjects[CurrentFrame].InFlightFences );
+		err = vkQueueSubmit( GraphicsQueue, submit_count, &submit_info, in_flight );
 		if ( err != VK_SUCCESS )
 		{
 			throw std::runtime_error( "failed to submit draw command buffer!" );
@@ -414,8 +417,7 @@ namespace VulkanRHI
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to enumerate Vulkan Instance extension properties. "
-				"vkEnumerateInstanceExtensionProperties returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				"vkEnumerateInstanceExtensionProperties returned: {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -426,8 +428,7 @@ namespace VulkanRHI
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to enumerate Vulkan Instance extension properties. "
-				"vkEnumerateInstanceExtensionProperties returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				"vkEnumerateInstanceExtensionProperties returned: {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -436,14 +437,13 @@ namespace VulkanRHI
 		{
 			if ( !IsExtensionAvailable( available_extensions, ext ) )
 			{
-				std::string message = std::format(
-					"[Vulkan] Required extension is not available. Extension name: {}",
-					ext );
+				std::string message = std::format( 
+					"[Vulkan] Required extension is not available. Extension name: {}", ext );
 				return std::unexpected( message );
 			}
 		}
 
-		instance_info.enabledExtensionCount = static_cast< uint32 >( ContextInfo.Extensions.size() );
+		instance_info.enabledExtensionCount = static_cast<uint32>( ContextInfo.Extensions.size() );
 		instance_info.ppEnabledExtensionNames = ContextInfo.Extensions.data();
 
 		uint32 count_layers = 0;
@@ -452,8 +452,7 @@ namespace VulkanRHI
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to enumerate Vulkan Instance layer properties. "
-				"vkEnumerateInstanceLayerProperties() returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				"vkEnumerateInstanceLayerProperties() returned: {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -464,8 +463,7 @@ namespace VulkanRHI
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to enumerate Vulkan Instance layer properties. "
-				"vkEnumerateInstanceLayerProperties() returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				"vkEnumerateInstanceLayerProperties() returned: {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -474,9 +472,7 @@ namespace VulkanRHI
 		{
 			if ( !IsLayerAvailable( available_layers, layer ) )
 			{
-				std::string message = std::format(
-					"Required layer is not available. Layer name: %s",
-					layer );
+				std::string message = std::format( "Required layer is not available. Layer name: {}.", layer );
 				return std::unexpected( message );
 			}
 		}
@@ -489,9 +485,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Instance. vkCreateInstance() returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan Instance. vkCreateInstance() returned: {}.", err );
 			return std::unexpected( message );
 		}
 
@@ -501,11 +495,11 @@ namespace VulkanRHI
 	Expected<VkSurfaceKHR> Context::CreateSurface()
 	{
 		VkSurfaceKHR surface;
-		if ( !SDL_Vulkan_CreateSurface( WindowHandle, Instance, nullptr, &surface ) )
+		if ( bool result = SDL_Vulkan_CreateSurface( WindowHandle, Instance, nullptr, &surface ); !result )
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to create Vulkan Surface with SDL_Vulkan_CreateSurface. "
-				"Error message : %s",
+				"Error message : {}",
 				SDL_GetError() );
 			return std::unexpected( message );
 		}
@@ -516,68 +510,85 @@ namespace VulkanRHI
 	{
 		VkResult err;
 
-		uint32 count = 0;
-		err = vkEnumeratePhysicalDevices( Instance, &count, nullptr );
-		if ( err != VK_SUCCESS || count == 0 )
-		{
-			std::string message = std::format(
-				"[Vulkan] Failed to enumerate GPUs with Vulkan support."
-				" vkEnumeratePhysicalDevices returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
-			return std::unexpected( message );
-		}
-
-		std::vector<VkPhysicalDevice> devices( count );
-		err = vkEnumeratePhysicalDevices( Instance, &count, devices.data() );
+		uint32 gpu_count = 0;
+		err = vkEnumeratePhysicalDevices( Instance, &gpu_count, nullptr );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to enumerate GPUs with Vulkan support."
-				" vkEnumeratePhysicalDevices returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				" vkEnumeratePhysicalDevices returned: {}.",
 				err );
 			return std::unexpected( message );
 		}
 
-		for ( const auto& device : devices )
+		LOG_INFO( "[Vulkan] Available GPUs amount: {}", gpu_count );
+
+		std::vector<VkPhysicalDevice> devices( gpu_count );
+		err = vkEnumeratePhysicalDevices( Instance, &gpu_count, devices.data() );
+		if ( err != VK_SUCCESS )
+		{
+			std::string message = std::format(
+				"[Vulkan] Failed to enumerate GPUs with Vulkan support."
+				" vkEnumeratePhysicalDevices returned: {}.",
+				err );
+			return std::unexpected( message );
+		}
+
+		LOG_INFO( "[Vulkan] Enumerating GPUs:" );
+		for ( const auto& gpu : devices )
 		{
 			VkPhysicalDeviceProperties props;
-			vkGetPhysicalDeviceProperties( device, &props );
+			vkGetPhysicalDeviceProperties( gpu, &props );
 
 			VkPhysicalDeviceFeatures features;
-			vkGetPhysicalDeviceFeatures( device, &features );
+			vkGetPhysicalDeviceFeatures( gpu, &features );
 
-			//QueueFamilyIndices indices = FindQueueFamilies( device );
+			LOG_INFO( "[Vulkan] GPU: {}", props.deviceName );
 
-			//uint32 count_extensions = 0;
-			//err = vkEnumerateDeviceExtensionProperties( device, nullptr, &count, nullptr );
-			//CheckVulkanResult( err );
-
-			//std::vector<VkExtensionProperties> available_extensions( count_extensions );
-			//err = vkEnumerateDeviceExtensionProperties( device, nullptr, &count, available_extensions.data() );
-			//CheckVulkanResult( err );
-
-			//bool swapchain_support = false;
-			//for ( const auto& ext : available_extensions ) {
-			//    if ( ext.extensionName == VK_KHR_SWAPCHAIN_EXTENSION_NAME ) {
-			//        swapchain_support = true;
-			//        break;
-			//    }
-			//}
-
-			if ( props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU /* && swapchain_support */ )
+			uint32 count_extensions = 0;
+			const char* layer_name = nullptr;
+			err = vkEnumerateDeviceExtensionProperties( gpu, layer_name, &count_extensions, nullptr );
+			if ( err != VK_SUCCESS )
 			{
-				return device;
+				std::string message = std::format(
+					"[Vulkan] Failed to enumerate GPU supported extensions. "
+					"vkEnumerateDeviceExtensionProperties returned {}.",
+					err );
+				return std::unexpected( message );
+			}
+
+			std::vector<VkExtensionProperties> extensions( count_extensions );
+			err = vkEnumerateDeviceExtensionProperties( gpu, nullptr, &count_extensions, extensions.data() );
+			if ( err != VK_SUCCESS )
+			{
+				std::string message = std::format(
+					"[Vulkan] Failed to enumerate GPU supported extensions. "
+					"vkEnumerateDeviceExtensionProperties returned {}.",
+					err );
+				return std::unexpected( message );
+			}
+
+			auto pred = [] ( const VkExtensionProperties& ext_prop ) -> bool {
+				return std::strcmp( ext_prop.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME );
+			};
+			auto it = std::ranges::find_if( extensions, pred );
+			bool swapchain_supported = it != extensions.end();
+
+			LOG_INFO( "[Vulkan] {} swapchain supported: {}.", props.deviceName, swapchain_supported );
+
+			if ( props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && swapchain_supported )
+			{
+				return gpu;
 			}
 		}
 
-		LOG_INFO( "[Vulkan] Discrete GPU is not available, first available will be selected." );
+		LOG_INFO( "[Vulkan] Discrete GPU is not available or does not supported required extensions"
+			" first available will be selected." );
 
 		return devices[0];
 	}
 
-	Expected<VulkanQueueFamilyIndices> Context::FindQueueFamilies( VkPhysicalDevice device, 
+	Expected<VulkanQueueFamilyIndices> Context::FindQueueFamilies( VkPhysicalDevice device,
 		VkSurfaceKHR surface )
 	{
 		uint32 count = 0;
@@ -595,14 +606,13 @@ namespace VulkanRHI
 			}
 
 			VkBool32 present_support = false;
-			VkResult err = vkGetPhysicalDeviceSurfaceSupportKHR( device, family_index, surface, 
+			VkResult err = vkGetPhysicalDeviceSurfaceSupportKHR( device, family_index, surface,
 				&present_support );
 			if ( err != VK_SUCCESS )
 			{
 				std::string message = std::format(
 					"[Vulkan] Error checking GPU surface support. "
-					"vkGetPhysicalDeviceSurfaceSupportKHR returned: {}={}.",
-					VK_TYPE_TO_STR( VkResult ),
+					"vkGetPhysicalDeviceSurfaceSupportKHR returned: {}.",
 					err );
 				return std::unexpected( message );
 			}
@@ -647,7 +657,7 @@ namespace VulkanRHI
 		device_info.pQueueCreateInfos = queue_infos.data();
 
 		VkPhysicalDeviceFeatures physical_device_features = {};
-		physical_device_features.samplerAnisotropy = VK_TRUE;
+		physical_device_features.samplerAnisotropy = true;
 
 		device_info.pEnabledFeatures = &physical_device_features;
 		device_info.enabledLayerCount = static_cast< uint32 >( ContextInfo.Layers.size() );
@@ -661,13 +671,11 @@ namespace VulkanRHI
 		device_info.ppEnabledExtensionNames = device_extensions.data();
 
 		VkDevice device;
-		VkResult err = vkCreateDevice( PhysicalDevice, &device_info, nullptr, &device );
+		VkResult err = vkCreateDevice( Gpu, &device_info, nullptr, &device );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Device. vkCreateDevice returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan Device. vkCreateDevice returned: {}.", err );
 			return std::unexpected( message );
 		}
 		return device;
@@ -690,7 +698,7 @@ namespace VulkanRHI
 		int32 width, height;
 		SDL_GetWindowSize( WindowHandle, &width, &height );
 
-		swapchain_info.imageExtent = { static_cast<uint32>( width ), static_cast<uint32>( height ) };
+		swapchain_info.imageExtent = { static_cast< uint32 >( width ), static_cast< uint32 >( height ) };
 
 		swapchain_info.minImageCount = 3;
 		swapchain_info.imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
@@ -709,9 +717,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Swapchain. vkCreateSwapchainKHR returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan Swapchain. vkCreateSwapchainKHR returned: {}", err );
 			return std::unexpected( message );
 		}
 
@@ -720,9 +726,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to receive Swapchain Images. vkGetSwapchainImagesKHR() returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to receive Swapchain Images. vkGetSwapchainImagesKHR() returned: {}", err );
 			return std::unexpected( message );
 		}
 		swapchain.Images.resize( count_images );
@@ -731,9 +735,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to receive swapchain images. vkGetSwapchainImageKHR() returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to receive swapchain images. vkGetSwapchainImageKHR() returned: {}.", err );
 			return std::unexpected( message );
 		}
 		return swapchain;
@@ -743,12 +745,12 @@ namespace VulkanRHI
 	{
 		vkDeviceWaitIdle( Device );
 
-		Swapchain.Cleanup( Device );
+		Swapchain.Destroy( Device );
 
 		auto swapchain_result = CreateSwapchain();
 		if ( !swapchain_result )
 		{
-			LOG_ERROR( "{}", swapchain_result.error() );
+			LOG_ERROR( swapchain_result.error() );
 			throw std::runtime_error( "swapchain == VK_NULL_HANDLE" );
 		}
 		Swapchain = std::move( swapchain_result.value() );
@@ -756,26 +758,26 @@ namespace VulkanRHI
 		auto image_views_result = CreateImageViews();
 		if ( !image_views_result )
 		{
-			LOG_ERROR( "{}", image_views_result.error() );
+			LOG_ERROR( image_views_result.error() );
 		}
 		Swapchain.ImageViews = std::move( image_views_result.value() );
 
 		auto texture_result = CreateDepthTexture();
 		if ( !texture_result )
 		{
-			LOG_ERROR( "{}", texture_result.error() );
+			LOG_ERROR( texture_result.error() );
 		}
 		DepthTexture = std::move( texture_result.value() );
 
 		auto framebuffers_result = CreateFramebuffers();
 		if ( !framebuffers_result )
 		{
-			LOG_ERROR( "{}", framebuffers_result.error() );
+			LOG_ERROR( framebuffers_result.error() );
 		}
 		Swapchain.Framebuffers = std::move( framebuffers_result.value() );
 	}
 
-	VkShaderModule Context::CreateShaderModule( const std::vector<char>& code )
+	Expected<VkShaderModule> Context::CreateShaderModule( const std::vector<char>& code )
 	{
 		VkShaderModuleCreateInfo module_info = {};
 		module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -787,11 +789,9 @@ namespace VulkanRHI
 		VkResult err = vkCreateShaderModule( Device, &module_info, nullptr, &shader_module );
 		if ( err != VK_SUCCESS )
 		{
-			LOG_ERROR(
-				"[Vulkan] Failed to create Vulkan Shader Module. vkCreateShaderModule returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
-			return VK_NULL_HANDLE;
+			std::string message = std::format(
+				"[Vulkan] Failed to create Vulkan Shader Module. vkCreateShaderModule returned: {}.", err );
+			return std::unexpected( message );
 		}
 		return shader_module;
 	}
@@ -830,8 +830,7 @@ namespace VulkanRHI
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to create Vulkan Descriptor set layout. "
-				"vkCreateDescriptorSetLayout returned {}={}",
-				VK_TYPE_TO_STR( err ),
+				"vkCreateDescriptorSetLayout returned {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -846,8 +845,7 @@ namespace VulkanRHI
 		{
 			std::string message = std::format(
 				"[Vulkan] Failed to create Vulkan Pipeline Layout."
-				"vkCreatePipelineLayout returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				"vkCreatePipelineLayout returned: {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -917,9 +915,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Render Pass. vkCreateRenderPass returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan Render Pass. vkCreateRenderPass returned: {}.", err );
 			return std::unexpected( message );
 		}
 
@@ -941,7 +937,7 @@ namespace VulkanRHI
 
 		VkPipelineDynamicStateCreateInfo dynamic_state_info = {};
 		dynamic_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		dynamic_state_info.dynamicStateCount = static_cast< uint32 >( dynamic_states.size() );
+		dynamic_state_info.dynamicStateCount = static_cast<uint32>( dynamic_states.size() );
 		dynamic_state_info.pDynamicStates = dynamic_states.data();
 
 		auto binding_desc = Vertex::GetBindingDescription();
@@ -949,7 +945,7 @@ namespace VulkanRHI
 		VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
 		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vertex_input_info.vertexBindingDescriptionCount = 1;
-		vertex_input_info.vertexAttributeDescriptionCount = static_cast< uint32 >( attribute_desc.size() );
+		vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>( attribute_desc.size() );
 		vertex_input_info.pVertexBindingDescriptions = &binding_desc;
 		vertex_input_info.pVertexAttributeDescriptions = attribute_desc.data();
 
@@ -1022,8 +1018,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Graphics Pipeline. vkCreateGraphicsPipeline returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				"[Vulkan] Failed to create Vulkan Graphics Pipeline. vkCreateGraphicsPipeline returned: {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -1059,9 +1054,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Image View. vkCreateImageView returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan Image View. vkCreateImageView returned: {}.", err );
 			return std::unexpected( message );
 		}
 		return view;
@@ -1073,8 +1066,7 @@ namespace VulkanRHI
 
 		for ( size_t i = 0; i < Swapchain.Images.size(); ++i )
 		{
-			auto view_result = CreateImageView( Swapchain.Images[i], Swapchain.Format, 
-				VK_IMAGE_ASPECT_COLOR_BIT );
+			auto view_result = CreateImageView( Swapchain.Images[i], Swapchain.Format, VK_IMAGE_ASPECT_COLOR_BIT );
 			if ( !view_result )
 			{
 				return std::unexpected( view_result.error() );
@@ -1107,9 +1099,7 @@ namespace VulkanRHI
 			if ( err != VK_SUCCESS )
 			{
 				std::string message = std::format(
-					"[Vulkan] Failed to create framebuffer. vkCreateFramebuffer returned: {}={}",
-					VK_TYPE_TO_STR( VkResult ),
-					err );
+					"[Vulkan] Failed to create framebuffer. vkCreateFramebuffer returned: {}.", err );
 				return std::unexpected( message );
 			}
 		}
@@ -1128,15 +1118,13 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Command Pool. vkCreateCommandPool returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan Command Pool. vkCreateCommandPool returned: {}", err );
 			return std::unexpected( message );
 		}
 		return command_pool;
 	}
 
-	std::vector<VkCommandBuffer> Context::CreateCommandBuffers()
+	Expected<std::vector<VkCommandBuffer>> Context::CreateCommandBuffers()
 	{
 		std::vector<VkCommandBuffer> command_buffers( MAX_FRAMES_IN_FLIGHT );
 
@@ -1144,17 +1132,14 @@ namespace VulkanRHI
 		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		alloc_info.commandPool = CommandPool;
 		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		alloc_info.commandBufferCount = static_cast<uint32>( command_buffers.size() );
+		alloc_info.commandBufferCount = static_cast< uint32 >( command_buffers.size() );
 
 		VkResult err = vkAllocateCommandBuffers( Device, &alloc_info, command_buffers.data() );
 		if ( err != VK_SUCCESS )
 		{
-			LOG_ERROR(
-				"[Vulkan] Error allocating Vulkan Command Buffers. vkAllocateCommandBuffers returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
-				err
-			);
-			return {};
+			std::string message = std::format(
+				"[Vulkan] Error allocating Vulkan Command Buffers. vkAllocateCommandBuffers returned: {}.", err );
+			return std::unexpected( message );
 		}
 		return command_buffers;
 	}
@@ -1175,37 +1160,39 @@ namespace VulkanRHI
 
 		for ( VulkanSyncObjects& obj : sync_objs )
 		{
-			err = vkCreateSemaphore( Device, &semaphore_info, alloc, &obj.ImageAvailableSemaphores );
+			VkSemaphore image_available = VK_NULL_HANDLE;
+			err = vkCreateSemaphore( Device, &semaphore_info, alloc, &image_available );
 			if ( err != VK_SUCCESS )
 			{
 				std::string message = std::format(
-					"[Vulkan] Failed to create Image Available semaphore object. "
-					"vkCreateSemaphore returned {}={}",
-					VK_TYPE_TO_STR( VkResult ),
+					"[Vulkan] Failed to create Image Available semaphore object. vkCreateSemaphore returned {}.",
 					err );
 				return std::unexpected( message );
 			}
 
-			err = vkCreateSemaphore( Device, &semaphore_info, alloc, &obj.RenderFinishedSemaphores );
+			VkSemaphore render_finished = VK_NULL_HANDLE;
+			err = vkCreateSemaphore( Device, &semaphore_info, alloc, &render_finished );
 			if ( err != VK_SUCCESS )
 			{
 				std::string message = std::format(
 					"[Vulkan] Failed to create Render Finished semaphore object. "
-					"vkCreateSemaphore returned {}={}",
-					VK_TYPE_TO_STR( VkResult ),
+					"vkCreateSemaphore returned {}",
 					err );
 				return std::unexpected( message );
 			}
 
-			err = vkCreateFence( Device, &fence_info, alloc, &obj.InFlightFences );
+			VkFence in_flight = VK_NULL_HANDLE;
+			err = vkCreateFence( Device, &fence_info, alloc, &in_flight );
 			if ( err != VK_SUCCESS )
 			{
 				std::string message = std::format(
-					"[Vulkan] Failed to create Fences. vkCreateFence returned {}={}",
-					VK_TYPE_TO_STR( VkResult ),
-					err );
+					"[Vulkan] Failed to create Fences. vkCreateFence returned {}", err );
 				return std::unexpected( message );
 			}
+
+			obj.ImageAvailableSemaphore = std::move( image_available );
+			obj.RenderFinishedSemaphore = std::move( render_finished );
+			obj.InFlightFence = std::move( in_flight );
 		}
 		return sync_objs;
 	}
@@ -1213,7 +1200,7 @@ namespace VulkanRHI
 	uint32 Context::FindMemoryType( uint32 type_filter, VkMemoryPropertyFlags prop_flags )
 	{
 		VkPhysicalDeviceMemoryProperties memory_props = {};
-		vkGetPhysicalDeviceMemoryProperties( PhysicalDevice, &memory_props );
+		vkGetPhysicalDeviceMemoryProperties( Gpu, &memory_props );
 
 		for ( uint32 i = 0; memory_props.memoryTypeCount; ++i )
 		{
@@ -1231,7 +1218,6 @@ namespace VulkanRHI
 		VkMemoryPropertyFlags props )
 	{
 		VkResult err;
-		VulkanBuffer buffer;
 
 		VkBufferCreateInfo buffer_info = {};
 		buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1240,45 +1226,46 @@ namespace VulkanRHI
 		buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		const VkAllocationCallbacks* alloc = nullptr;
-		err = vkCreateBuffer( Device, &buffer_info, alloc, &buffer.Instance );
+
+		VkBuffer instance = VK_NULL_HANDLE;
+		err = vkCreateBuffer( Device, &buffer_info, alloc, &instance );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan Buffer. vkCreate buffer returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan Buffer. vkCreate buffer returned {}.", err );
 			return std::unexpected( message );
 		}
 
 		VkMemoryRequirements memory_requirements = {};
-		vkGetBufferMemoryRequirements( Device, buffer.Instance, &memory_requirements );
+		vkGetBufferMemoryRequirements( Device, instance, &memory_requirements );
 
 		VkMemoryAllocateInfo allocate_info = {};
 		allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		allocate_info.allocationSize = memory_requirements.size;
 		allocate_info.memoryTypeIndex = FindMemoryType( memory_requirements.memoryTypeBits, props );
 
-		err = vkAllocateMemory( Device, &allocate_info, alloc, &buffer.Memory );
+		VkDeviceMemory memory = VK_NULL_HANDLE;
+		err = vkAllocateMemory( Device, &allocate_info, alloc, &memory );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to allocate memory. vkAllocateMemory returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to allocate memory. vkAllocateMemory returned {}.", err );
 			return std::unexpected( message );
 		}
 
 		const VkDeviceSize memory_offset = 0;
-		err = vkBindBufferMemory( Device, buffer.Instance, buffer.Memory, memory_offset );
+		err = vkBindBufferMemory( Device, instance, memory, memory_offset );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to bind buffer memory. vkBindBufferMemory returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err
-			);
+				"[Vulkan] Failed to bind buffer memory. vkBindBufferMemory returned {}.", err );
 			return std::unexpected( message );
 		}
+
+		VulkanBuffer buffer = {
+			.Instance = std::move( instance ),
+			.Memory = std::move( memory )
+		};
 		return buffer;
 	}
 
@@ -1300,14 +1287,11 @@ namespace VulkanRHI
 		VkResult err = vkMapMemory( Device, staging_buffer.Memory, offset, buffer_size, flags, &data );
 		if ( err != VK_SUCCESS )
 		{
-			std::string message = std::format(
-				"[Vulkan] Failed to map memory. vkMapMemory returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+			std::string message = std::format( "[Vulkan] Failed to map memory. vkMapMemory returned {}.", err );
 			return std::unexpected( message );
 		}
 
-		memcpy( data, VERTICES.data(), static_cast< size_t >( buffer_size ) );
+		memcpy( data, VERTICES.data(), static_cast<size_t>( buffer_size ) );
 		vkUnmapMemory( Device, staging_buffer.Memory );
 
 		usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -1321,9 +1305,7 @@ namespace VulkanRHI
 
 		CopyBuffer( staging_buffer.Instance, vertex_buffer.Instance, buffer_size );
 
-		const VkAllocationCallbacks* alloc = nullptr;
-		vkDestroyBuffer( Device, staging_buffer.Instance, alloc );
-		vkFreeMemory( Device, staging_buffer.Memory, alloc );
+		staging_buffer.Destroy( Device );
 
 		return vertex_buffer;
 	}
@@ -1348,9 +1330,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to map memory. vkMapMemory returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to map memory. vkMapMemory returned {}.", err );
 			return std::unexpected( message );
 		}
 
@@ -1368,9 +1348,7 @@ namespace VulkanRHI
 
 		CopyBuffer( staging_buffer.Instance, index_buffer.Instance, buffer_size );
 
-		const VkAllocationCallbacks* alloc = nullptr;
-		vkDestroyBuffer( Device, staging_buffer.Instance, alloc );
-		vkFreeMemory( Device, staging_buffer.Memory, alloc );
+		staging_buffer.Destroy( Device );
 
 		return index_buffer;
 	}
@@ -1399,9 +1377,7 @@ namespace VulkanRHI
 			if ( err != VK_SUCCESS )
 			{
 				std::string message = std::format(
-					"[Vulkan] Failed to map memory. vkMapMemory returned {}={}.",
-					VK_TYPE_TO_STR( VkResult ),
-					err );
+					"[Vulkan] Failed to map memory. vkMapMemory returned {}.", err );
 				return std::unexpected( message );
 			}
 		}
@@ -1414,7 +1390,7 @@ namespace VulkanRHI
 		auto command_buffer_result = BeginSingleTimeCommands();
 		if ( !command_buffer_result )
 		{
-			LOG_ERROR( "{}", command_buffer_result.error() );
+			LOG_ERROR( command_buffer_result.error() );
 			throw std::runtime_error( "BeginSingleTimeCommands failed" );
 		}
 		VkCommandBuffer command_buffer = std::move( command_buffer_result.value() );
@@ -1443,13 +1419,13 @@ namespace VulkanRHI
 			glm::vec3( 0.0f, 0.0f, 1.0f ) );
 
 		ubo.View = glm::lookAt(
-			glm::vec3( 1.0f ),
+			glm::vec3( 2.0f ),
 			glm::vec3( 0.0f ),
 			glm::vec3( 0.0f, 0.0f, 1.0f ) );
 
 		ubo.Projection = glm::perspective(
 			glm::radians( 45.0f ),
-			Swapchain.Extent.width / static_cast< float >( Swapchain.Extent.height ),
+			Swapchain.Extent.width / static_cast<float>( Swapchain.Extent.height ),
 			0.1f,
 			10.0f );
 
@@ -1461,13 +1437,12 @@ namespace VulkanRHI
 	Expected<VulkanDescriptorGroup> Context::CreateDescriptorGroup()
 	{
 		VkResult err;
-		VulkanDescriptorGroup descriptor_group = {};
 
 		std::array<VkDescriptorPoolSize, 2> pool_sizes = {};
 		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		pool_sizes[0].descriptorCount = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
+		pool_sizes[0].descriptorCount = static_cast<uint32>( MAX_FRAMES_IN_FLIGHT );
 		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[1].descriptorCount = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
+		pool_sizes[1].descriptorCount = static_cast<uint32>( MAX_FRAMES_IN_FLIGHT );
 
 		VkDescriptorPoolCreateInfo pool_info = {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1476,13 +1451,13 @@ namespace VulkanRHI
 		pool_info.maxSets = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
 
 		const VkAllocationCallbacks* alloc = nullptr;
-		err = vkCreateDescriptorPool( Device, &pool_info, alloc, &descriptor_group.Pool );
+
+		VkDescriptorPool pool = VK_NULL_HANDLE;
+		err = vkCreateDescriptorPool( Device, &pool_info, alloc, &pool );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Descriptor Pool. vkCreateDescriptorPool returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create descriptor pool. vkCreateDescriptorPool returned {}.", err );
 			return std::unexpected( message );
 		}
 
@@ -1490,18 +1465,16 @@ namespace VulkanRHI
 			GraphicsPipeline.DescriptorSetLayout );
 		VkDescriptorSetAllocateInfo allocate_info = {};
 		allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocate_info.descriptorPool = descriptor_group.Pool;
-		allocate_info.descriptorSetCount = static_cast< uint32 >( MAX_FRAMES_IN_FLIGHT );
+		allocate_info.descriptorPool = pool;
+		allocate_info.descriptorSetCount = static_cast<uint32>( layouts.size() );
 		allocate_info.pSetLayouts = layouts.data();
 
-		descriptor_group.Sets.resize( MAX_FRAMES_IN_FLIGHT );
-		err = vkAllocateDescriptorSets( Device, &allocate_info, descriptor_group.Sets.data() );
+		std::vector<VkDescriptorSet> sets( layouts.size() );
+		err = vkAllocateDescriptorSets( Device, &allocate_info, sets.data() );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to allocate Descriptor Sets. vkAllocateDescriptorSets returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to allocate Descriptor Sets. vkAllocateDescriptorSets returned {}.", err );
 			return std::unexpected( message );
 		}
 
@@ -1519,7 +1492,7 @@ namespace VulkanRHI
 
 			std::array<VkWriteDescriptorSet, 2> descriptor_writes = {};
 			descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptor_writes[0].dstSet = descriptor_group.Sets[i];
+			descriptor_writes[0].dstSet = sets[i];
 			descriptor_writes[0].dstBinding = 0;
 			descriptor_writes[0].dstArrayElement = 0;
 			descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1527,19 +1500,24 @@ namespace VulkanRHI
 			descriptor_writes[0].pBufferInfo = &buffer_info;
 
 			descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptor_writes[1].dstSet = descriptor_group.Sets[i];
+			descriptor_writes[1].dstSet = sets[i];
 			descriptor_writes[1].dstBinding = 1;
 			descriptor_writes[1].dstArrayElement = 0;
 			descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptor_writes[1].descriptorCount = 1;
 			descriptor_writes[1].pImageInfo = &image_info;
 
-			const uint32 descriptor_write_count = static_cast< uint32 >( descriptor_writes.size() );
+			const uint32 descriptor_write_count = static_cast<uint32>( descriptor_writes.size() );
 			const uint32 descriptor_copy_count = 0;
 			const VkCopyDescriptorSet* descriptor_copies = nullptr;
 			vkUpdateDescriptorSets( Device, descriptor_write_count, descriptor_writes.data(),
 				descriptor_copy_count, descriptor_copies );
 		}
+
+		VulkanDescriptorGroup descriptor_group = {
+			.Pool = std::move( pool ),
+			.Sets = std::move( sets )
+		};
 		return descriptor_group;
 	}
 
@@ -1548,12 +1526,12 @@ namespace VulkanRHI
 		VkResult err;
 
 		auto assets_path = Application::ExecutablePath()
-			.parent_path().parent_path().parent_path().parent_path().parent_path() / "Assets" / "tyler.jpg";
+			.parent_path().parent_path().parent_path().parent_path().parent_path() / "Assets" / "brick.jpg";
 		std::string assets_path_string = assets_path.string();
 
-		int32 width;
-		int32 height;
-		int32 channels;
+		int32 width = 0;
+		int32 height = 0;
+		int32 channels = 0;
 		stbi_uc* pixels = stbi_load( assets_path_string.c_str(), &width, &height, &channels, STBI_rgb_alpha );
 		if ( !pixels )
 		{
@@ -1563,10 +1541,8 @@ namespace VulkanRHI
 
 		VkDeviceSize image_size = width * height * 4;
 
-		VkBufferUsageFlags    flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		VkMemoryPropertyFlags props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		auto staging_buffer_result = CreateBuffer( image_size, flags, props );
+		auto staging_buffer_result = CreateBuffer( image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 		if ( !staging_buffer_result )
 		{
 			return std::unexpected( staging_buffer_result.error() );
@@ -1579,44 +1555,34 @@ namespace VulkanRHI
 		err = vkMapMemory( Device, staging_buffer.Memory, offset, image_size, memory_flags, &data );
 		if ( err != VK_SUCCESS )
 		{
-			std::string message = std::format(
-				"[Vulkan] Failed to map memory. vkMapMemory returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+			std::string message = std::format( "[Vulkan] Failed to map memory. vkMapMemory returned {}.", err );
 			return std::unexpected( message );
 		}
-
-		memcpy( data, pixels, static_cast< size_t >( image_size ) );
+		memcpy( data, pixels, static_cast<size_t>( image_size ) );
 		vkUnmapMemory( Device, staging_buffer.Memory );
 
 		stbi_image_free( pixels );
 
-		flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		props = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		auto texture_image_result = CreateTextureImage( width, height, VK_FORMAT_R8G8B8A8_SRGB,
-			VK_IMAGE_TILING_OPTIMAL, flags, props );
+			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		if ( !texture_image_result )
 		{
 			return std::unexpected( texture_image_result.error() );
 		}
 		VulkanTexture texture = std::move( texture_image_result.value() );
 
-		VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageLayout new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		TransitionImageLayout( texture, VK_FORMAT_R8G8B8A8_SRGB, old_layout, new_layout );
+		TransitionImageLayout( texture, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
 		CopyBufferToImage(
 			staging_buffer.Instance,
 			texture.Image,
-			static_cast< uint32 >( width ),
-			static_cast< uint32 >( height ) );
+			static_cast<uint32>( width ),
+			static_cast<uint32>( height ) );
 
-		old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		TransitionImageLayout( texture, VK_FORMAT_R8G8B8A8_SRGB, old_layout, new_layout );
-
-		const VkAllocationCallbacks* alloc = nullptr;
-		vkDestroyBuffer( Device, staging_buffer.Instance, alloc );
-		vkFreeMemory( Device, staging_buffer.Memory, alloc );
+		TransitionImageLayout( texture, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+		staging_buffer.Destroy( Device );
 
 		auto view_result = CreateImageView( texture.Image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT );
 		if ( !view_result )
@@ -1632,28 +1598,27 @@ namespace VulkanRHI
 		sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		sampler_info.anisotropyEnable = VK_TRUE;
+		sampler_info.anisotropyEnable = true;
 
 		VkPhysicalDeviceProperties physical_props = {};
-		vkGetPhysicalDeviceProperties( PhysicalDevice, &physical_props );
+		vkGetPhysicalDeviceProperties( Gpu, &physical_props );
 
 		sampler_info.maxAnisotropy = physical_props.limits.maxSamplerAnisotropy;
 		sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		sampler_info.unnormalizedCoordinates = VK_FALSE;
-		sampler_info.compareEnable = VK_FALSE;
+		sampler_info.unnormalizedCoordinates = false;
+		sampler_info.compareEnable = false;
 		sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
 		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		sampler_info.mipLodBias = 0.0f;
 		sampler_info.minLod = 0.0f;
 		sampler_info.maxLod = 0.0f;
 
+		const VkAllocationCallbacks* alloc = nullptr;
 		err = vkCreateSampler( Device, &sampler_info, alloc, &texture.Sampler );
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan texture sampler. vkCreateSampler returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan texture sampler. vkCreateSampler returned {}.", err );
 			return std::unexpected( message );
 		}
 		return texture;
@@ -1684,9 +1649,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to create Vulkan texture image. vkCreateImage returned: {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to create Vulkan texture image. vkCreateImage returned: {}.", err );
 			return std::unexpected( message );
 		}
 
@@ -1702,9 +1665,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to allocate memory for Vulkan texture. vkAllocateMemory returned: {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to allocate memory for Vulkan texture. vkAllocateMemory returned: {}.", err );
 			return std::unexpected( message );
 		}
 
@@ -1713,9 +1674,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to bind Vulkan texture memory. vkBindImageMemory returned: {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to bind Vulkan texture memory. vkBindImageMemory returned: {}.", err );
 			return std::unexpected( message );
 		}
 		return texture;
@@ -1766,8 +1725,7 @@ namespace VulkanRHI
 		{
 			LOG_ERROR(
 				"[Vulkan] Error beginning recording Vulkan Command Buffer. "
-				"vkBeginCommandBuffer returned: {} = {}.",
-				VK_TYPE_TO_STR( VkResult ),
+				"vkBeginCommandBuffer returned: {}.",
 				err );
 			throw std::runtime_error( "failed to begin recording command buffer" );
 		}
@@ -1849,8 +1807,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			LOG_ERROR(
-				"[Vulkan] Error ending recording Vulkan Command Buffer. vkEndCommandBuffer returned: {}={}",
-				VK_TYPE_TO_STR( VkResult ),
+				"[Vulkan] Error ending recording Vulkan Command Buffer. vkEndCommandBuffer returned: {}.",
 				err );
 			throw std::runtime_error( "failed to end recording command buffer" );
 		}
@@ -1870,8 +1827,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to allocate command buffers. vkAllocateCommandBuffers returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
+				"[Vulkan] Failed to allocate command buffers. vkAllocateCommandBuffers returned {}.",
 				err );
 			return std::unexpected( message );
 		}
@@ -1884,9 +1840,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			std::string message = std::format(
-				"[Vulkan] Failed to begin command buffer. vkBeginCommandBuffer returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to begin command buffer. vkBeginCommandBuffer returned {}.", err );
 			return std::unexpected( message );
 		}
 		return command_buffer;
@@ -1898,10 +1852,7 @@ namespace VulkanRHI
 		err = vkEndCommandBuffer( command_buffer );
 		if ( err != VK_SUCCESS )
 		{
-			LOG_ERROR(
-				"[Vulkan] Failed to end command buffer. vkEndCommandBuffer returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+			LOG_ERROR( "[Vulkan] Failed to end command buffer. vkEndCommandBuffer returned {}.", err );
 			throw std::runtime_error( "vkEndCommandBuffer failed" );
 		}
 
@@ -1914,10 +1865,7 @@ namespace VulkanRHI
 		err = vkQueueSubmit( GraphicsQueue, 1, &submit_info, fence );
 		if ( err != VK_SUCCESS )
 		{
-			LOG_ERROR(
-				"[Vulkan] Failed to submit queue. vkQueueSubmit returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+			LOG_ERROR( "[Vulkan] Failed to submit queue. vkQueueSubmit returned {}.", err );
 			throw std::runtime_error( "vkQueueSubmit failed" );
 		}
 
@@ -1925,9 +1873,7 @@ namespace VulkanRHI
 		if ( err != VK_SUCCESS )
 		{
 			LOG_ERROR(
-				"[Vulkan] Failed to wait for queue idle. vkQueueWaitIdle returned {}={}.",
-				VK_TYPE_TO_STR( VkResult ),
-				err );
+				"[Vulkan] Failed to wait for queue idle. vkQueueWaitIdle returned {}.", err );
 			throw std::runtime_error( "vkQeueuWaitIdle failed" );
 		}
 
@@ -1941,7 +1887,7 @@ namespace VulkanRHI
 		auto command_buffer_result = BeginSingleTimeCommands();
 		if ( !command_buffer_result )
 		{
-			LOG_ERROR( "{}", command_buffer_result.error() );
+			LOG_ERROR( command_buffer_result.error() );
 			throw std::runtime_error( "BeginSingleTimeCommands failed" );
 		}
 		VkCommandBuffer command_buffer = std::move( command_buffer_result.value() );
@@ -2013,8 +1959,15 @@ namespace VulkanRHI
 			throw std::runtime_error( "unsupported layout transition" );
 		}
 
-		vkCmdPipelineBarrier( command_buffer, source_stage, destination_stage, 0, 0, nullptr, 0, nullptr, 1,
-			&barrier );
+		const VkDependencyFlags dependency_flags = 0;
+		const uint32 memory_barrier_count = 0;
+		const VkMemoryBarrier* memoryBarriers = nullptr;
+		const uint32 bufferMemoryBarrierCount = 0;
+		const VkBufferMemoryBarrier* bufferMemoryBarrier = nullptr;
+		const uint32 imageBarrierCount = 1;
+		vkCmdPipelineBarrier( command_buffer, source_stage, destination_stage, dependency_flags, 
+			memory_barrier_count, memoryBarriers, bufferMemoryBarrierCount, bufferMemoryBarrier, 
+			imageBarrierCount, &barrier );
 		EndSingleTimeCommands( command_buffer );
 	}
 
@@ -2023,7 +1976,7 @@ namespace VulkanRHI
 		auto command_buffer_result = BeginSingleTimeCommands();
 		if ( !command_buffer_result )
 		{
-			LOG_ERROR( "{}", command_buffer_result.error() );
+			LOG_ERROR( command_buffer_result.error() );
 			throw std::runtime_error( "BeginSingleTimeCommands failed" );
 		}
 		VkCommandBuffer command_buffer = std::move( command_buffer_result.value() );
@@ -2047,25 +2000,20 @@ namespace VulkanRHI
 			1
 		};
 
-		vkCmdCopyBufferToImage(
-			command_buffer,
-			buffer,
-			image,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			1,
-			&region
-		);
+		uint32 region_count = 1;
+		vkCmdCopyBufferToImage( command_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			region_count, &region );
 
 		EndSingleTimeCommands( command_buffer );
 	}
 
 	Expected<VkFormat> Context::FindSupportedFormat( std::span<const VkFormat> candidates,
-		VkImageTiling tiling, VkFormatFeatureFlags features )
+		VkImageTiling tiling, VkFormatFeatureFlags features ) const
 	{
 		for ( VkFormat format : candidates )
 		{
 			VkFormatProperties props;
-			vkGetPhysicalDeviceFormatProperties( PhysicalDevice, format, &props );
+			vkGetPhysicalDeviceFormatProperties( Gpu, format, &props );
 
 			if ( tiling == VK_IMAGE_TILING_LINEAR && ( props.linearTilingFeatures & features ) == features )
 			{

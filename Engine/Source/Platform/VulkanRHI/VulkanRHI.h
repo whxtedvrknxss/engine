@@ -51,7 +51,7 @@ namespace VulkanRHI
 		std::vector<VkImageView> ImageViews;
 		std::vector<VkFramebuffer> Framebuffers;
 
-		void Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		void Destroy( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
 			for ( auto framebuffer : Framebuffers )
 			{
@@ -74,7 +74,7 @@ namespace VulkanRHI
 		VkPipeline       Instance = VK_NULL_HANDLE;
 		VkDescriptorSetLayout DescriptorSetLayout = VK_NULL_HANDLE;
 
-		void Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		void inline Destroy( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
 			vkDestroyDescriptorSetLayout( device, DescriptorSetLayout, alloc );
 			vkDestroyPipeline( device, Instance, alloc );
@@ -85,9 +85,16 @@ namespace VulkanRHI
 
 	struct VulkanSyncObjects
 	{
-		VkSemaphore ImageAvailableSemaphores = VK_NULL_HANDLE;
-		VkSemaphore RenderFinishedSemaphores = VK_NULL_HANDLE;
-		VkFence InFlightFences = VK_NULL_HANDLE;
+		VkSemaphore ImageAvailableSemaphore = VK_NULL_HANDLE;
+		VkSemaphore RenderFinishedSemaphore = VK_NULL_HANDLE;
+		VkFence InFlightFence = VK_NULL_HANDLE;
+
+		void inline Destroy( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		{
+			vkDestroySemaphore( device, ImageAvailableSemaphore, alloc );
+			vkDestroySemaphore( device, RenderFinishedSemaphore, alloc );
+			vkDestroyFence( device, InFlightFence, alloc );
+		}
 	};
 
 	struct VulkanBuffer
@@ -96,7 +103,7 @@ namespace VulkanRHI
 		VkDeviceMemory Memory = VK_NULL_HANDLE;
 		void*		   Mapped = nullptr;
 
-		void inline Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		void inline Destroy( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
 			vkDestroyBuffer( device, Instance, alloc );
 			vkFreeMemory( device, Memory, alloc );
@@ -116,7 +123,7 @@ namespace VulkanRHI
 		VkSampler      Sampler = VK_NULL_HANDLE;
 		VkDeviceMemory Memory = VK_NULL_HANDLE;
 
-		void Cleanup( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
+		void inline Destroy( VkDevice device, const VkAllocationCallbacks* alloc = nullptr )
 		{
 			if ( Sampler )
 			{
@@ -172,7 +179,7 @@ namespace VulkanRHI
 		Expected<VulkanSwapchain>  CreateSwapchain();
 		void RecreateSwapchain();
 
-		VkShaderModule         CreateShaderModule( const std::vector<char>& code );
+		Expected<VkShaderModule>         CreateShaderModule( const std::vector<char>& code );
 		Expected<VulkanGraphicsPipeline> CreateGraphicsPipeline( VkShaderModule vertex,
 			VkShaderModule fragment );
 
@@ -180,8 +187,8 @@ namespace VulkanRHI
 		Expected<std::vector<VkImageView>>   CreateImageViews();
 		Expected<std::vector<VkFramebuffer>> CreateFramebuffers();
 
-		Expected<VkCommandPool> CreateCommandPool( VulkanQueueFamilyIndices indices );
-		std::vector<VkCommandBuffer> CreateCommandBuffers();
+		Expected<VkCommandPool>				   CreateCommandPool( VulkanQueueFamilyIndices indices );
+		Expected<std::vector<VkCommandBuffer>> CreateCommandBuffers();
 
 		Expected<std::vector<VulkanSyncObjects>> CreateSyncObjects();
 
@@ -214,7 +221,7 @@ namespace VulkanRHI
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32 width, uint32 height );
 
 		Expected<VkFormat> FindSupportedFormat( std::span<const VkFormat> candidates,
-			VkImageTiling tiling, VkFormatFeatureFlags features );
+			VkImageTiling tiling, VkFormatFeatureFlags features ) const;
 		Expected<VkFormat> FindDepthFormat();
 
 	private:
@@ -224,7 +231,7 @@ namespace VulkanRHI
 	private:
 		VkInstance       Instance;
 		VkSurfaceKHR     Surface;
-		VkPhysicalDevice PhysicalDevice;
+		VkPhysicalDevice Gpu;
 		VkDevice         Device;
 		VkQueue          GraphicsQueue;
 		VkQueue          PresentQueue;

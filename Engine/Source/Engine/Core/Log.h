@@ -16,8 +16,6 @@
 #ifdef VULKAN_SUPPORTED 
 #include <vulkan/vulkan.h>
 
-#define VK_TYPE_TO_STR(type) #type
-
 template<>
 struct fmt::formatter<VkResult> : fmt::formatter<std::string>
 {
